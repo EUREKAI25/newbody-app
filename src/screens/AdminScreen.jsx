@@ -1,11 +1,40 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, Edit2, Save, X, Bell, BellOff } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Edit2, Save, X, Bell, BellOff, Upload } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useReminders } from '../hooks/useReminders'
+import { api, setApiKey, getApiKey } from '../api/client'
 import { nanoid } from '../hooks/nanoid'
 
 const ADMIN_PASSWORD = 'newbody2026'
+
+function FileUpload({ onUploaded }) {
+  const [uploading, setUploading] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true); setErr('')
+    try {
+      const { url } = await api.upload(file)
+      onUploaded('https://newbody.nathaliebrigitte.com' + url)
+    } catch {
+      setErr('Clé API manquante ou upload échoué')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <label className="flex items-center gap-2 cursor-pointer text-orange-400 text-sm">
+      <Upload size={14} />
+      {uploading ? 'Envoi…' : 'Uploader une image'}
+      <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      {err && <span className="text-red-400 text-xs">{err}</span>}
+    </label>
+  )
+}
 
 function ExerciseForm({ exercise, muscleGroups, onSave, onCancel }) {
   const [form, setForm] = useState(exercise || {
@@ -24,8 +53,10 @@ function ExerciseForm({ exercise, muscleGroups, onSave, onCancel }) {
       </select>
       <div className="flex gap-2">
         <input type="number" placeholder="Durée (min)" value={form.duration_min} onChange={f('duration_min')} className="input-field w-1/3" />
-        <input placeholder="URL visuel" value={form.media_url} onChange={f('media_url')} className="input-field flex-1" />
+        <input placeholder="URL visuel" value={form.media_url} onChange={e => setForm(s => ({ ...s, media_url: e.target.value }))} className="input-field flex-1" />
       </div>
+      <FileUpload onUploaded={url => setForm(s => ({ ...s, media_url: url }))} />
+      {form.media_url && <img src={form.media_url} alt="" className="w-full h-24 object-cover rounded-xl" />}
       <textarea placeholder="Instructions..." value={form.instructions} onChange={f('instructions')} rows={3} className="input-field resize-none" />
       <div className="flex gap-2">
         <button onClick={() => onSave(form)} className="btn-primary flex-1 flex items-center justify-center gap-1"><Save size={14}/> Enregistrer</button>
@@ -301,6 +332,7 @@ export default function AdminScreen() {
         {/* ===== SETTINGS ===== */}
         {section === 'settings' && (
           <div className="space-y-4">
+            <ApiKeyConfig />
             <div className="bg-[#1a1a1a] rounded-2xl p-4">
               <p className="text-white font-semibold mb-1">Objectif</p>
               <input
@@ -343,6 +375,32 @@ export default function AdminScreen() {
   )
 }
 
+function ApiKeyConfig() {
+  const [key, setKey] = useState(getApiKey)
+  const [saved, setSaved] = useState(false)
+  return (
+    <div className="bg-[#1a1a1a] rounded-2xl p-4">
+      <p className="text-white font-semibold mb-1">Clé API</p>
+      <p className="text-white/40 text-xs mb-3">Nécessaire pour sauvegarder les données sur le serveur.</p>
+      <div className="flex gap-2">
+        <input
+          type="password"
+          value={key}
+          onChange={e => setKey(e.target.value)}
+          placeholder="Clé API…"
+          className="input-field flex-1"
+        />
+        <button
+          onClick={() => { setApiKey(key); setSaved(true); setTimeout(() => setSaved(false), 2000) }}
+          className="btn-primary px-4"
+        >
+          {saved ? '✓' : 'OK'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function VisualForm({ visual, onSave, onCancel }) {
   const [form, setForm] = useState(visual || { id: nanoid(), name: '', url: '', category: 'inspiration' })
   const f = k => e => setForm(s => ({ ...s, [k]: e.target.value }))
@@ -350,6 +408,8 @@ function VisualForm({ visual, onSave, onCancel }) {
     <div className="bg-[#222] rounded-2xl p-4 space-y-3">
       <input placeholder="Nom" value={form.name} onChange={f('name')} className="input-field" />
       <input placeholder="URL image" value={form.url} onChange={f('url')} className="input-field" />
+      <FileUpload onUploaded={url => setForm(s => ({ ...s, url }))} />
+      {form.url && <img src={form.url} alt="" className="w-full h-24 object-cover rounded-xl" />}
       <select value={form.category} onChange={f('category')} className="input-field">
         {['inspiration','objectif','energie'].map(c => <option key={c} value={c}>{c}</option>)}
       </select>

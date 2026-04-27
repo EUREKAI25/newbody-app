@@ -1,121 +1,151 @@
 import { useState, useEffect, createContext, useContext } from 'react'
-import {
-  MUSCLE_GROUPS, EXERCISES, BONUS_TYPES, BONUS_ITEMS,
-  PROGRESS_PHOTO_ZONES, VISUALS, DEFAULT_GOAL, DEFAULT_REMINDER_RULES
-} from '../data/seed'
-
-const STORAGE_KEY = 'newbody_v1'
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return null
-}
-
-function getInitialState() {
-  const saved = loadState()
-  return {
-    goal: saved?.goal ?? { ...DEFAULT_GOAL },
-    reminderRules: saved?.reminderRules ?? { ...DEFAULT_REMINDER_RULES },
-    muscleGroups: saved?.muscleGroups ?? MUSCLE_GROUPS,
-    exercises: saved?.exercises ?? EXERCISES,
-    bonusTypes: saved?.bonusTypes ?? BONUS_TYPES,
-    bonusItems: saved?.bonusItems ?? BONUS_ITEMS,
-    progressPhotoZones: saved?.progressPhotoZones ?? PROGRESS_PHOTO_ZONES,
-    visuals: saved?.visuals ?? VISUALS,
-    sessions: saved?.sessions ?? [],
-    bonusLogs: saved?.bonusLogs ?? [],
-    dailyLogs: saved?.dailyLogs ?? [],
-    progressPhotos: saved?.progressPhotos ?? [],
-    notificationsEnabled: saved?.notificationsEnabled ?? false,
-  }
-}
+import { api } from '../api/client'
+import { MUSCLE_GROUPS, EXERCISES, BONUS_TYPES, BONUS_ITEMS, PROGRESS_PHOTO_ZONES, VISUALS, DEFAULT_GOAL, DEFAULT_REMINDER_RULES } from '../data/seed'
 
 const StoreContext = createContext(null)
 
 export function StoreProvider({ children }) {
-  const [state, setState] = useState(getInitialState)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const [state, setState] = useState({
+    goal: { ...DEFAULT_GOAL },
+    reminderRules: { ...DEFAULT_REMINDER_RULES },
+    muscleGroups: MUSCLE_GROUPS,
+    exercises: EXERCISES,
+    bonusTypes: BONUS_TYPES,
+    bonusItems: BONUS_ITEMS,
+    progressPhotoZones: PROGRESS_PHOTO_ZONES,
+    visuals: VISUALS,
+    sessions: [],
+    bonusLogs: [],
+    progressPhotos: [],
+    notificationsEnabled: JSON.parse(localStorage.getItem('newbody_notif') || 'false'),
+  })
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    api.all()
+      .then(data => {
+        setState(s => ({
+          ...s,
+          goal: data.goal?.title ? data.goal : s.goal,
+          reminderRules: data.reminderRules?.start_time ? {
+            ...data.reminderRules,
+            excluded_ranges: typeof data.reminderRules.excluded_ranges === 'string'
+              ? JSON.parse(data.reminderRules.excluded_ranges)
+              : data.reminderRules.excluded_ranges,
+          } : s.reminderRules,
+          muscleGroups: data.muscleGroups?.length ? data.muscleGroups : s.muscleGroups,
+          exercises: data.exercises?.length ? data.exercises : s.exercises,
+          bonusTypes: data.bonusTypes?.length ? data.bonusTypes : s.bonusTypes,
+          bonusItems: data.bonusItems?.length ? data.bonusItems : s.bonusItems,
+          progressPhotoZones: data.progressPhotoZones?.length ? data.progressPhotoZones : s.progressPhotoZones,
+          visuals: data.visuals?.length ? data.visuals : s.visuals,
+          sessions: data.sessions || [],
+          bonusLogs: data.bonusLogs || [],
+          progressPhotos: data.progressPhotos || [],
+        }))
+        setLoading(false)
+      })
+      .catch(err => {
+        console.warn('API unreachable, using seed data', err)
+        setError('Hors ligne — données locales')
+        setLoading(false)
+      })
+  }, [])
 
   const update = (partial) => setState(s => ({ ...s, ...partial }))
 
-  // --- Goal ---
-  const setGoal = (fields) => update({ goal: { ...state.goal, ...fields } })
+  const setGoal = async (fields) => {
+    const newGoal = { ...state.goal, ...fields }
+    update({ goal: newGoal })
+    try { await api.setGoal(newGoal) } catch {}
+  }
 
-  // --- Sessions ---
-  const addSession = (session) => update({ sessions: [session, ...state.sessions] })
-  const updateSession = (id, fields) => update({
-    sessions: state.sessions.map(s => s.id === id ? { ...s, ...fields } : s)
-  })
+  const addSession = async (session) => {
+    update({ sessions: [session, ...state.sessions] })
+    try { await api.addSession({ ...session, exercises: JSON.stringify(session.exercises) }) } catch {}
+  }
 
-  const getSessionsForDate = (dateStr) =>
-    state.sessions.filter(s => s.date === dateStr)
+  const updateSession = (id, fields) => {
+    update({ sessions: state.sessions.map(s => s.id === id ? { ...s, ...fields } : s) })
+  }
 
-  const getSessionsForMonth = (year, month) =>
-    state.sessions.filter(s => {
-      const d = new Date(s.date)
-      return d.getFullYear() === year && d.getMonth() === month
-    })
+  const addBonusLog = async (log) => {
+    update({ bonusLogs: [log, ...state.bonusLogs] })
+    try { await api.addBonusLog(log) } catch {}
+  }
 
-  // --- Bonus logs ---
-  const addBonusLog = (log) => update({ bonusLogs: [log, ...state.bonusLogs] })
+  const addProgressPhoto = async (photo) => {
+    update({ progressPhotos: [photo, ...state.progressPhotos] })
+    try { await api.addProgressPhoto(photo) } catch {}
+  }
 
-  // --- Progress photos ---
-  const addProgressPhoto = (photo) => update({ progressPhotos: [photo, ...state.progressPhotos] })
-
-  // --- Admin: exercises ---
-  const saveExercise = (ex) => {
+  const saveExercise = async (ex) => {
     const exists = state.exercises.find(e => e.id === ex.id)
-    if (exists) {
-      update({ exercises: state.exercises.map(e => e.id === ex.id ? ex : e) })
-    } else {
-      update({ exercises: [...state.exercises, ex] })
-    }
+    update({ exercises: exists
+      ? state.exercises.map(e => e.id === ex.id ? ex : e)
+      : [...state.exercises, ex]
+    })
+    try { await api.saveExercise(ex) } catch {}
   }
-  const deleteExercise = (id) => update({ exercises: state.exercises.filter(e => e.id !== id) })
 
-  // --- Admin: bonus items ---
-  const saveBonusItem = (item) => {
+  const deleteExercise = async (id) => {
+    update({ exercises: state.exercises.filter(e => e.id !== id) })
+    try { await api.deleteExercise(id) } catch {}
+  }
+
+  const saveBonusItem = async (item) => {
     const exists = state.bonusItems.find(b => b.id === item.id)
-    if (exists) {
-      update({ bonusItems: state.bonusItems.map(b => b.id === item.id ? item : b) })
-    } else {
-      update({ bonusItems: [...state.bonusItems, item] })
-    }
+    update({ bonusItems: exists
+      ? state.bonusItems.map(b => b.id === item.id ? item : b)
+      : [...state.bonusItems, item]
+    })
+    try { await api.saveBonusItem(item) } catch {}
   }
-  const deleteBonusItem = (id) => update({ bonusItems: state.bonusItems.filter(b => b.id !== id) })
 
-  // --- Admin: visuals ---
-  const saveVisual = (v) => {
+  const deleteBonusItem = async (id) => {
+    update({ bonusItems: state.bonusItems.filter(b => b.id !== id) })
+    try { await api.deleteBonusItem(id) } catch {}
+  }
+
+  const saveVisual = async (v) => {
     const exists = state.visuals.find(x => x.id === v.id)
-    if (exists) {
-      update({ visuals: state.visuals.map(x => x.id === v.id ? v : x) })
-    } else {
-      update({ visuals: [...state.visuals, v] })
-    }
+    update({ visuals: exists
+      ? state.visuals.map(x => x.id === v.id ? v : x)
+      : [...state.visuals, v]
+    })
+    try { await api.saveVisual(v) } catch {}
   }
-  const deleteVisual = (id) => update({ visuals: state.visuals.filter(v => v.id !== id) })
 
-  // --- Reminder rules ---
-  const setReminderRules = (rules) => update({ reminderRules: { ...state.reminderRules, ...rules } })
+  const deleteVisual = async (id) => {
+    update({ visuals: state.visuals.filter(v => v.id !== id) })
+    try { await api.deleteVisual(id) } catch {}
+  }
 
-  const setNotificationsEnabled = (v) => update({ notificationsEnabled: v })
+  const setReminderRules = async (rules) => {
+    const merged = { ...state.reminderRules, ...rules }
+    update({ reminderRules: merged })
+    try { await api.setReminderRules(merged) } catch {}
+  }
+
+  const setNotificationsEnabled = (v) => {
+    update({ notificationsEnabled: v })
+    localStorage.setItem('newbody_notif', JSON.stringify(v))
+  }
 
   const resetAllData = () => {
-    localStorage.removeItem(STORAGE_KEY)
-    setState(getInitialState())
+    localStorage.clear()
+    window.location.reload()
   }
 
   return (
     <StoreContext.Provider value={{
       ...state,
+      loading,
+      error,
       setGoal,
-      addSession, updateSession, getSessionsForDate, getSessionsForMonth,
+      addSession, updateSession,
       addBonusLog,
       addProgressPhoto,
       saveExercise, deleteExercise,
