@@ -1,6 +1,7 @@
 const BASE = 'https://newbody.nathaliebrigitte.com'
 
-let apiKey = localStorage.getItem('newbody_api_key') || ''
+// Clé baked dans le build, ou stockée localement (admin)
+let apiKey = import.meta.env.VITE_NEWBODY_API_KEY || localStorage.getItem('newbody_api_key') || ''
 
 export function setApiKey(key) {
   apiKey = key

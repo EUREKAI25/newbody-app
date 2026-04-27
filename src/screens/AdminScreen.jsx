@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Edit2, Save, X, Bell, BellOff, Upload } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useReminders } from '../hooks/useReminders'
-import { api, setApiKey, getApiKey } from '../api/client'
+import { api } from '../api/client'
 import { nanoid } from '../hooks/nanoid'
 
 const ADMIN_PASSWORD = 'newbody2026'
@@ -332,7 +332,6 @@ export default function AdminScreen() {
         {/* ===== SETTINGS ===== */}
         {section === 'settings' && (
           <div className="space-y-4">
-            <ApiKeyConfig />
             <div className="bg-[#1a1a1a] rounded-2xl p-4">
               <p className="text-white font-semibold mb-1">Objectif</p>
               <input
@@ -375,31 +374,6 @@ export default function AdminScreen() {
   )
 }
 
-function ApiKeyConfig() {
-  const [key, setKey] = useState(getApiKey)
-  const [saved, setSaved] = useState(false)
-  return (
-    <div className="bg-[#1a1a1a] rounded-2xl p-4">
-      <p className="text-white font-semibold mb-1">Clé API</p>
-      <p className="text-white/40 text-xs mb-3">Nécessaire pour sauvegarder les données sur le serveur.</p>
-      <div className="flex gap-2">
-        <input
-          type="password"
-          value={key}
-          onChange={e => setKey(e.target.value)}
-          placeholder="Clé API…"
-          className="input-field flex-1"
-        />
-        <button
-          onClick={() => { setApiKey(key); setSaved(true); setTimeout(() => setSaved(false), 2000) }}
-          className="btn-primary px-4"
-        >
-          {saved ? '✓' : 'OK'}
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function VisualForm({ visual, onSave, onCancel }) {
   const [form, setForm] = useState(visual || { id: nanoid(), name: '', url: '', category: 'inspiration' })
