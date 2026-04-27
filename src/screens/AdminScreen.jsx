@@ -108,8 +108,13 @@ export default function AdminScreen() {
   return (
     <div className="min-h-[100dvh] pb-10">
       <div className="px-4 pt-12 pb-3 flex items-center gap-3">
-        <button onClick={() => navigate('/')} className="text-white/60"><ArrowLeft size={20}/></button>
-        <h1 className="text-xl font-bold text-white">Admin</h1>
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-1.5 text-white/60 hover:text-white transition-colors"
+        >
+          <ArrowLeft size={18}/> <span className="text-sm">Retour</span>
+        </button>
+        <h1 className="text-xl font-bold text-white ml-2">Admin</h1>
       </div>
 
       {/* Section tabs */}
