@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Edit2, Settings } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
+import NotifBanner from '../components/NotifBanner'
 
 function daysUntil(dateStr) {
   if (!dateStr) return null
@@ -110,6 +111,11 @@ export default function HomeScreen() {
         >
           Changer le fond ↑
         </button>
+      </div>
+
+      {/* Notification banner */}
+      <div className="relative z-10">
+        <NotifBanner />
       </div>
 
       {/* Quick actions */}

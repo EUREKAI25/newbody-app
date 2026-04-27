@@ -255,20 +255,38 @@ export default function AdminScreen() {
               {!store.notificationsEnabled ? (
                 <button
                   onClick={async () => {
-                    const ok = await requestAndEnable()
-                    setNotifStatus(ok ? 'Notifications activées !' : 'Permission refusée.')
+                    const result = await requestAndEnable()
+                    if (result.ok) {
+                      setNotifStatus('✅ Notifications activées !')
+                    } else if (result.reason === 'denied') {
+                      setNotifStatus('blocked')
+                    } else {
+                      setNotifStatus('❌ Permission non accordée.')
+                    }
                   }}
                   className="btn-primary w-full flex items-center justify-center gap-2"
                 >
                   <Bell size={16}/> Activer les rappels
                 </button>
               ) : (
-                <button onClick={() => { disable(); setNotifStatus('Notifications désactivées.') }}
+                <button onClick={() => { disable(); setNotifStatus('Désactivées.') }}
                   className="bg-white/10 text-white/60 py-3 rounded-xl w-full flex items-center justify-center gap-2">
                   <BellOff size={16}/> Désactiver
                 </button>
               )}
-              {notifStatus && <p className="text-orange-400 text-sm">{notifStatus}</p>}
+              {notifStatus === 'blocked' ? (
+                <div className="bg-amber-900/30 border border-amber-500/30 rounded-xl p-3 mt-1">
+                  <p className="text-amber-300 text-xs font-semibold mb-1">Notifications bloquées par le navigateur</p>
+                  <p className="text-amber-200/60 text-xs leading-relaxed">
+                    Pour débloquer :<br/>
+                    • iPhone/iPad installé : <strong>Réglages → [NewBody] → Notifications</strong><br/>
+                    • Safari : <strong>Réglages → Safari → Notifications</strong><br/>
+                    • Chrome : cliquer sur 🔒 dans la barre d'adresse
+                  </p>
+                </div>
+              ) : notifStatus ? (
+                <p className="text-orange-400 text-sm">{notifStatus}</p>
+              ) : null}
             </div>
 
             <ReminderRulesForm rules={store.reminderRules} onSave={store.setReminderRules} />

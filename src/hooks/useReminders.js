@@ -16,11 +16,14 @@ export function useReminders() {
   }, [scheduleToday, notificationsEnabled])
 
   async function requestAndEnable() {
-    if (!('Notification' in window)) return false
+    if (!('Notification' in window)) return { ok: false, reason: 'unsupported' }
+    const current = Notification.permission
+    if (current === 'denied') return { ok: false, reason: 'denied' }
     const perm = await Notification.requestPermission()
-    if (perm !== 'granted') return false
+    if (perm !== 'granted') return { ok: false, reason: 'dismissed' }
     setNotificationsEnabled(true)
-    return true
+    scheduleToday()
+    return { ok: true }
   }
 
   function disable() {
@@ -30,5 +33,10 @@ export function useReminders() {
     })
   }
 
-  return { requestAndEnable, disable, scheduleToday }
+  function getPermissionStatus() {
+    if (!('Notification' in window)) return 'unsupported'
+    return Notification.permission // 'default' | 'granted' | 'denied'
+  }
+
+  return { requestAndEnable, disable, scheduleToday, getPermissionStatus }
 }
