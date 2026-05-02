@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Edit2, Save, X, Bell, BellOff, Upload, Play } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useReminders } from '../hooks/useReminders'
-import { useAudio } from '../hooks/useAudio'
+import { useAudio, getAudioConfig, saveAudioConfig } from '../hooks/useAudio'
 import { api } from '../api/client'
 import { nanoid } from '../hooks/nanoid'
 
 const VPS = 'https://newbody.nathaliebrigitte.com'
-const ADMIN_PASSWORD = 'newbody2026'
+const ADMIN_PASSWORD = 'zorbec'
 
 function FileUpload({ onUploaded, accept = 'image/*', label = 'Uploader une image' }) {
   const [uploading, setUploading] = useState(false)
@@ -610,25 +610,114 @@ function ProgramForm({ program, onSave, onCancel }) {
 
 // ── Section Sons ─────────────────────────────────────────────────────────────
 function SoundsSection({ playShortBeep, playStartBeep, playEndSession }) {
+  const [cfg, setCfg] = useState(() => getAudioConfig())
+  const [saved, setSaved] = useState(false)
+
+  function update(key, value) {
+    const next = { ...cfg, [key]: value }
+    setCfg(next)
+    saveAudioConfig(next)
+  }
+
+  function persist() {
+    saveAudioConfig(cfg)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }
+
   return (
-    <div className="bg-[#1a1a1a] rounded-2xl p-4 space-y-4">
-      <p className="text-white font-semibold">Sons de séance</p>
-      <p className="text-white/30 text-xs">Les sons sont inclus dans l'application (public/sounds/).</p>
-      {[
-        { label: 'Bip court (décompte 5-4-3-2-1)', fn: playShortBeep, file: 'short_beep.mp3' },
-        { label: 'Bip départ exercice', fn: playStartBeep, file: 'start_beep.mp3' },
-        { label: 'Son fin de séance', fn: playEndSession, file: 'end_session.mp3' },
-      ].map(({ label, fn, file }) => (
-        <div key={file} className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-white text-sm">{label}</p>
-            <p className="text-white/30 text-xs">{file}</p>
+    <div className="space-y-3">
+      {/* Musique de fond */}
+      <div className="bg-[#1a1a1a] rounded-2xl p-4 space-y-4">
+        <p className="text-white font-semibold">Musique de fond séance</p>
+
+        <label className="flex items-center justify-between">
+          <span className="text-white/60 text-sm">Activer la musique</span>
+          <input type="checkbox" checked={cfg.music_enabled}
+            onChange={e => update('music_enabled', e.target.checked)}
+            className="accent-orange-500 w-4 h-4"/>
+        </label>
+
+        <div>
+          <label className="text-white/40 text-xs block mb-1">URL ou chemin du fichier MP3</label>
+          <div className="flex gap-2">
+            <input
+              value={cfg.default_session_audio_url}
+              onChange={e => setCfg(s => ({ ...s, default_session_audio_url: e.target.value }))}
+              onBlur={() => saveAudioConfig(cfg)}
+              placeholder="https://… ou /newbody-app/audio/session.mp3"
+              className="input-field flex-1 text-xs"
+            />
           </div>
-          <button onClick={fn} className="flex items-center gap-1.5 bg-white/10 hover:bg-white/15 text-white/70 px-3 py-2 rounded-xl text-sm transition-colors">
-            <Play size={14}/> Tester
-          </button>
+          <FileUpload
+            accept="audio/*"
+            label="Uploader un MP3"
+            onUploaded={url => { update('default_session_audio_url', url) }}
+          />
+          {cfg.default_session_audio_url && (
+            <p className="text-green-400/60 text-xs mt-1">✓ Fichier configuré</p>
+          )}
         </div>
-      ))}
+
+        <div>
+          <div className="flex justify-between text-xs text-white/40 mb-1">
+            <span>Volume musique</span>
+            <span>{Math.round(cfg.volume_music * 100)}%</span>
+          </div>
+          <input type="range" min="0" max="1" step="0.05"
+            value={cfg.volume_music}
+            onChange={e => update('volume_music', Number(e.target.value))}
+            className="w-full accent-orange-500"/>
+        </div>
+
+        {cfg.default_session_audio_url && (
+          <button
+            onClick={() => {
+              const a = new Audio(cfg.default_session_audio_url)
+              a.volume = cfg.volume_music
+              a.play().then(() => setTimeout(() => a.pause(), 3000)).catch(() => alert('Lecture impossible — vérifier l\'URL'))
+            }}
+            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/15 text-white/70 px-3 py-2 rounded-xl text-sm transition-colors"
+          >
+            <Play size={14}/> Tester 3 sec
+          </button>
+        )}
+      </div>
+
+      {/* Bips timer */}
+      <div className="bg-[#1a1a1a] rounded-2xl p-4 space-y-4">
+        <p className="text-white font-semibold">Bips timer</p>
+        <p className="text-white/30 text-xs">Inclus dans l'app — public/sounds/</p>
+
+        <div>
+          <div className="flex justify-between text-xs text-white/40 mb-1">
+            <span>Volume bips</span>
+            <span>{Math.round(cfg.volume_beep * 100)}%</span>
+          </div>
+          <input type="range" min="0" max="1" step="0.05"
+            value={cfg.volume_beep}
+            onChange={e => update('volume_beep', Number(e.target.value))}
+            className="w-full accent-orange-500"/>
+        </div>
+
+        {[
+          { label: 'Bip court (T-5 → T-1)', fn: playShortBeep, file: 'short_beep.mp3' },
+          { label: 'Bip départ exercice', fn: playStartBeep, file: 'start_beep.mp3' },
+          { label: 'Son fin de séance', fn: playEndSession, file: 'end_session.mp3' },
+        ].map(({ label, fn, file }) => (
+          <div key={file} className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-white text-sm">{label}</p>
+              <p className="text-white/30 text-xs">{file}</p>
+            </div>
+            <button onClick={fn} className="flex items-center gap-1.5 bg-white/10 hover:bg-white/15 text-white/70 px-3 py-2 rounded-xl text-sm transition-colors">
+              <Play size={14}/> Tester
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {saved && <p className="text-green-400 text-sm text-center">✓ Config sauvegardée</p>}
     </div>
   )
 }

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store/useStore.jsx'
-import { useAudio } from '../hooks/useAudio.js'
+import { useAudio, useSessionMusic, getAudioConfig } from '../hooks/useAudio.js'
 import { useAdaptiveEngine } from '../hooks/useAdaptiveEngine.js'
 import { nanoid } from '../hooks/nanoid'
-import { Pause, Play, X, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { Pause, Play, X, Check, ChevronDown, ChevronUp, Plus, Volume2, VolumeX } from 'lucide-react'
 
 const VPS = 'https://newbody.nathaliebrigitte.com'
 
@@ -209,10 +209,12 @@ function ExerciseMedia({ exercise, loop = true, className = '' }) {
 function GuidedPlayer({ sequence, onAbandon, onFinish }) {
   const { addSession } = useStore()
   const { playShortBeep, playStartBeep, playEndSession } = useAudio()
+  const music = useSessionMusic()
 
   const [seqIdx, setSeqIdx] = useState(0)
   const [timeLeft, setTimeLeft] = useState(sequence[0]?.duration_sec || 30)
   const [paused, setPaused] = useState(false)
+  const [musicMuted, setMusicMuted] = useState(() => !getAudioConfig().music_enabled)
   const [sessionId] = useState(nanoid())
 
   const timerRef = useRef(null)
@@ -226,6 +228,7 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
     if (nextIdx >= sequenceRef.current.length) {
       clearInterval(timerRef.current)
       playEndSession()
+      music.stopMusic(true)
       const exercises = sequenceRef.current
         .filter(s => s.type === 'exercise')
         .map(s => s.exercise?.id)
@@ -250,6 +253,8 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
   }
 
   useEffect(() => {
+    music.init()
+    music.startMusic()
     playStartBeep()
     timerRef.current = setInterval(() => {
       if (pausedRef.current) return
@@ -263,16 +268,32 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
         return next
       })
     }, 1000)
-    return () => clearInterval(timerRef.current)
+    return () => {
+      clearInterval(timerRef.current)
+      music.destroy()
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function togglePause() {
-    pausedRef.current = !pausedRef.current
-    setPaused(p => !p)
+    const nowPaused = !pausedRef.current
+    pausedRef.current = nowPaused
+    setPaused(nowPaused)
+    if (nowPaused) {
+      music.pauseMusic()
+    } else {
+      music.resumeMusic()
+    }
+  }
+
+  function toggleMusicMute() {
+    const muted = !musicMuted
+    setMusicMuted(muted)
+    music.setMuted(muted)
   }
 
   function handleAbandon() {
     clearInterval(timerRef.current)
+    music.stopMusic(false)
     const exercises = sequenceRef.current
       .filter((s, i) => s.type === 'exercise' && i < seqIdxRef.current)
       .map(s => s.exercise?.id)
@@ -295,6 +316,7 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
   const nextEx = !isExercise ? current?.nextExercise : (sequence[seqIdx + 2]?.exercise || null)
   const total = initialDurations.current[seqIdx] || current?.duration_sec || 30
   const progress = Math.round(((seqIdx) / sequence.length) * 100)
+  const hasMusic = Boolean(getAudioConfig().default_session_audio_url)
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-[#0f0f0f]">
@@ -303,16 +325,29 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
         <div className="h-full bg-orange-500 transition-all duration-300" style={{ width: `${progress}%` }} />
       </div>
 
-      {/* Phase indicator */}
+      {/* Phase indicator + mute button */}
       <div className="px-4 pt-4 pb-2 flex items-center justify-between flex-shrink-0">
         <span className={`text-xs font-semibold uppercase tracking-wider px-3 py-1 rounded-full ${
           isExercise ? 'bg-orange-500/20 text-orange-400' : 'bg-gray-500/20 text-gray-400'
         }`}>
           {isExercise ? 'Exercice' : 'Repos'}
         </span>
-        <span className="text-white/30 text-xs">
-          {Math.floor(seqIdx / 2) + 1} / {Math.ceil(sequence.length / 2)}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-white/30 text-xs">
+            {Math.floor(seqIdx / 2) + 1} / {Math.ceil(sequence.length / 2)}
+          </span>
+          {hasMusic && (
+            <button
+              onClick={toggleMusicMute}
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                musicMuted ? 'bg-white/5 text-white/20' : 'bg-white/10 text-white/50 hover:text-white'
+              }`}
+              title={musicMuted ? 'Activer musique' : 'Couper musique'}
+            >
+              {musicMuted ? <VolumeX size={13}/> : <Volume2 size={13}/>}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Media zone */}
