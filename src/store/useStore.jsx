@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { api } from '../api/client'
-import { MUSCLE_GROUPS, EXERCISES, BONUS_TYPES, BONUS_ITEMS, PROGRESS_PHOTO_ZONES, VISUALS, DEFAULT_GOAL, DEFAULT_REMINDER_RULES } from '../data/seed'
+import { MUSCLE_GROUPS, EXERCISES, BONUS_TYPES, BONUS_ITEMS, PROGRESS_PHOTO_ZONES, VISUALS, DEFAULT_GOAL, DEFAULT_REMINDER_RULES, DEFAULT_ADAPTIVE_CONFIG, DEFAULT_TRAINING_PROFILE } from '../data/seed'
 
 const StoreContext = createContext(null)
 
@@ -20,6 +20,13 @@ export function StoreProvider({ children }) {
     sessions: [],
     bonusLogs: [],
     progressPhotos: [],
+    equipment: [],
+    equipmentVariants: [],
+    trainingProfile: { ...DEFAULT_TRAINING_PROFILE },
+    adaptiveConfig: { ...DEFAULT_ADAPTIVE_CONFIG },
+    workoutPrograms: [],
+    dailyCheckins: [],
+    sessionFeedbacks: [],
     notificationsEnabled: JSON.parse(localStorage.getItem('newbody_notif') || 'false'),
   })
 
@@ -44,6 +51,13 @@ export function StoreProvider({ children }) {
           sessions: data.sessions || [],
           bonusLogs: data.bonusLogs || [],
           progressPhotos: data.progressPhotos || [],
+          equipment: data.equipment || [],
+          equipmentVariants: data.equipmentVariants || [],
+          trainingProfile: data.trainingProfile?.id ? data.trainingProfile : s.trainingProfile,
+          adaptiveConfig: data.adaptiveConfig?.id ? data.adaptiveConfig : s.adaptiveConfig,
+          workoutPrograms: data.workoutPrograms || [],
+          dailyCheckins: data.dailyCheckins || [],
+          sessionFeedbacks: data.sessionFeedbacks || [],
         }))
         setLoading(false)
       })
@@ -134,6 +148,58 @@ export function StoreProvider({ children }) {
     localStorage.setItem('newbody_notif', JSON.stringify(v))
   }
 
+  const saveTrainingProfile = async (profile) => {
+    update({ trainingProfile: { ...state.trainingProfile, ...profile } })
+    try { await api.saveTrainingProfile({ ...state.trainingProfile, ...profile }) } catch {}
+  }
+
+  const saveAdaptiveConfig = async (config) => {
+    update({ adaptiveConfig: { ...state.adaptiveConfig, ...config } })
+    try { await api.saveAdaptiveConfig({ ...state.adaptiveConfig, ...config }) } catch {}
+  }
+
+  const saveCheckin = async (checkin) => {
+    const existing = state.dailyCheckins.find(c => c.date === checkin.date)
+    update({ dailyCheckins: existing
+      ? state.dailyCheckins.map(c => c.date === checkin.date ? { ...c, ...checkin } : c)
+      : [checkin, ...state.dailyCheckins]
+    })
+    try { await api.saveCheckin(checkin) } catch {}
+  }
+
+  const saveSessionFeedback = async (feedback) => {
+    update({ sessionFeedbacks: [feedback, ...state.sessionFeedbacks] })
+    try { await api.saveSessionFeedback(feedback) } catch {}
+  }
+
+  const saveWorkoutProgram = async (program) => {
+    const exists = state.workoutPrograms.find(p => p.id === program.id)
+    update({ workoutPrograms: exists
+      ? state.workoutPrograms.map(p => p.id === program.id ? program : p)
+      : [...state.workoutPrograms, program]
+    })
+    try { await api.saveWorkoutProgram(program) } catch {}
+  }
+
+  const deleteWorkoutProgram = async (id) => {
+    update({ workoutPrograms: state.workoutPrograms.filter(p => p.id !== id) })
+    try { await api.deleteWorkoutProgram(id) } catch {}
+  }
+
+  const saveEquipment = async (eq) => {
+    const exists = state.equipment.find(e => e.id === eq.id)
+    update({ equipment: exists
+      ? state.equipment.map(e => e.id === eq.id ? eq : e)
+      : [...state.equipment, eq]
+    })
+    try { await api.saveEquipment(eq) } catch {}
+  }
+
+  const deleteEquipment = async (id) => {
+    update({ equipment: state.equipment.filter(e => e.id !== id) })
+    try { await api.deleteEquipment(id) } catch {}
+  }
+
   const resetAllData = () => {
     localStorage.clear()
     window.location.reload()
@@ -153,6 +219,12 @@ export function StoreProvider({ children }) {
       saveVisual, deleteVisual,
       setReminderRules,
       setNotificationsEnabled,
+      saveTrainingProfile,
+      saveAdaptiveConfig,
+      saveCheckin,
+      saveSessionFeedback,
+      saveWorkoutProgram, deleteWorkoutProgram,
+      saveEquipment, deleteEquipment,
       resetAllData,
     }}>
       {children}

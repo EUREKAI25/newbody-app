@@ -154,3 +154,28 @@ export const DEFAULT_REMINDER_RULES = {
   required_per_day: 3,
   excluded_ranges: ['12:30-14:30'],
 }
+
+export const DEFAULT_TRAINING_PROFILE = {
+  level_estimate: 1,
+  energy_level: 3,
+  recovery_mode: false,
+  preferred_position: '',
+  equipment_list: [],
+  dumbbell_weights: [],
+  max_intensity_allowed: 3,
+  max_cardio_allowed: 2,
+  work_sec_base: 25,
+  rest_sec_base: 35,
+}
+
+export const DEFAULT_ADAPTIVE_CONFIG = {
+  target_muscle_min: 3,
+  target_muscle_max: 4,
+  max_cardio_allowed: 3,
+  adjust_step_percent: 0.10,
+  rest_adjust_percent: 0.15,
+  min_work_sec: 20,
+  max_work_sec: 60,
+  min_rest_sec: 10,
+  max_rest_sec: 60,
+}
