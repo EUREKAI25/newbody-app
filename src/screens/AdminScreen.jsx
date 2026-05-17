@@ -201,7 +201,12 @@ export default function AdminScreen() {
   const { requestAndEnable, disable } = useReminders()
   const { playShortBeep, playStartBeep, playEndSession } = useAudio()
 
-  const [auth, setAuth] = useState(false)
+  const [auth, setAuth] = useState(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('newbody_admin_session') || '{}')
+      return s.expires > Date.now()
+    } catch { return false }
+  })
   const [pwInput, setPwInput] = useState('')
   const [section, setSection] = useState('exercises')
   const [editingEx, setEditingEx] = useState(null)
@@ -223,9 +228,9 @@ export default function AdminScreen() {
         <p className="text-white/40 text-sm mb-8">Accès protégé</p>
         <input type="password" value={pwInput}
           onChange={e => setPwInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && (pwInput === ADMIN_PASSWORD ? setAuth(true) : alert('Mot de passe incorrect'))}
+          onKeyDown={e => { if (e.key === 'Enter') { if (pwInput === ADMIN_PASSWORD) { localStorage.setItem('newbody_admin_session', JSON.stringify({ expires: Date.now() + 7*24*60*60*1000 })); setAuth(true) } else alert('Mot de passe incorrect') }}}
           placeholder="Mot de passe…" className="input-field w-full mb-3 text-center" autoFocus/>
-        <button onClick={() => pwInput === ADMIN_PASSWORD ? setAuth(true) : alert('Mot de passe incorrect')} className="btn-primary w-full">Entrer</button>
+        <button onClick={() => { if (pwInput === ADMIN_PASSWORD) { localStorage.setItem('newbody_admin_session', JSON.stringify({ expires: Date.now() + 7*24*60*60*1000 })); setAuth(true) } else alert('Mot de passe incorrect') }} className="btn-primary w-full">Entrer</button>
         <button onClick={() => navigate(-1)} className="mt-4 text-white/30 text-sm">Retour</button>
       </div>
     )
