@@ -276,43 +276,12 @@ export default function AdminScreen() {
 
         {/* ===== EXERCISES ===== */}
         {section === 'exercises' && (
-          <>
-            <button onClick={() => setEditingEx('new')} className="btn-primary w-full flex items-center justify-center gap-2"><Plus size={16}/> Nouvel exercice</button>
-            {editingEx === 'new' && (
-              <ExerciseForm muscleGroups={store.muscleGroups} availableVideos={availableVideos}
-                onSave={ex => { store.saveExercise(ex); setEditingEx(null) }}
-                onCancel={() => setEditingEx(null)}/>
-            )}
-            {store.exercises.map(ex => {
-              const group = store.muscleGroups.find(g => g.id === ex.muscle_group_id)
-              return (
-                <div key={ex.id}>
-                  {editingEx === ex.id ? (
-                    <ExerciseForm exercise={ex} muscleGroups={store.muscleGroups} availableVideos={availableVideos}
-                      onSave={updated => { store.saveExercise(updated); setEditingEx(null) }}
-                      onCancel={() => setEditingEx(null)}/>
-                  ) : (
-                    <div className={`bg-[#1a1a1a] rounded-xl px-4 py-3 flex items-center gap-3 ${!ex.is_active ? 'opacity-40' : ''}`}>
-                      <div className="w-10 h-10 rounded-lg bg-orange-900/30 flex items-center justify-center text-lg flex-shrink-0 overflow-hidden">
-                        {ex.video_url
-                          ? <video src={ex.video_url.startsWith('http') ? ex.video_url : VPS + ex.video_url} className="w-full h-full object-cover" muted playsInline/>
-                          : ex.media_url
-                            ? <img src={ex.media_url} alt="" className="w-full h-full object-cover"/>
-                            : group?.icon
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{ex.name}</p>
-                        <p className="text-white/30 text-xs">{group?.name} · {ex.type} · cardio {ex.default_cardio ?? 2}/5</p>
-                      </div>
-                      <button onClick={() => setEditingEx(ex.id)} className="text-white/30 hover:text-white p-1"><Edit2 size={14}/></button>
-                      <button onClick={() => store.deleteExercise(ex.id)} className="text-red-400/50 hover:text-red-400 p-1"><Trash2 size={14}/></button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </>
+          <ExercisesSection
+            store={store}
+            availableVideos={availableVideos}
+            editingEx={editingEx}
+            setEditingEx={setEditingEx}
+          />
         )}
 
         {/* ===== BONUS ===== */}
@@ -440,6 +409,132 @@ export default function AdminScreen() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Section Exercices ────────────────────────────────────────────────────────
+const DIFF_COLORS_EX = { 1: 'bg-green-500', 2: 'bg-teal-400', 3: 'bg-orange-400', 4: 'bg-red-500', 5: 'bg-purple-500' }
+const DIFF_LABELS    = { 1: 'débutant', 2: 'facile', 3: 'intermédiaire', 4: 'avancé', 5: 'expert' }
+const GROUP_COLORS   = {
+  fessiers: 'bg-pink-500/20 text-pink-300', cuisses: 'bg-orange-500/20 text-orange-300',
+  ventre: 'bg-yellow-500/20 text-yellow-300', abdos_profond: 'bg-yellow-500/20 text-yellow-300',
+  dos: 'bg-blue-500/20 text-blue-300', bras: 'bg-purple-500/20 text-purple-300',
+  hanches: 'bg-red-500/20 text-red-300', corps_global: 'bg-teal-500/20 text-teal-300',
+  mobilite: 'bg-cyan-500/20 text-cyan-300', etirements: 'bg-green-500/20 text-green-300',
+  ischios: 'bg-orange-500/20 text-orange-300', quadriceps: 'bg-amber-500/20 text-amber-300',
+}
+
+function cleanExName(name) {
+  if (!name) return '—'
+  // Supprimer le préfixe FDownloader.Net + hash
+  const cleaned = name.replace(/^FDownloader\.Net\s+[A-Za-z0-9_\-+=]{10,}\s*/i, '').trim()
+  return cleaned || name
+}
+
+function ExerciseCard({ ex, group, onEdit, onDelete }) {
+  const score  = ex.difficulty_score || ex.default_intensity || 2
+  const dotColor = DIFF_COLORS_EX[score] || 'bg-white/20'
+  const classified = ex.classification_status === 'classified'
+  const hasName = !ex.name?.startsWith('FDownloader')
+  const displayName = cleanExName(ex.name)
+
+  return (
+    <div className={`bg-[#1a1a1a] rounded-xl overflow-hidden flex items-stretch gap-0 ${!ex.is_active ? 'opacity-40' : ''}`}>
+      {/* Vignette avec dot niveau */}
+      <div className="w-14 h-14 flex-shrink-0 relative bg-black/40">
+        {ex.thumbnail_url
+          ? <img src={ex.thumbnail_url.startsWith('http') ? ex.thumbnail_url : 'https://newbody.nathaliebrigitte.com' + ex.thumbnail_url} alt="" className="w-full h-full object-cover"/>
+          : ex.video_url
+            ? <video src={ex.video_url.startsWith('http') ? ex.video_url : 'https://newbody.nathaliebrigitte.com' + ex.video_url} className="w-full h-full object-cover" muted playsInline/>
+            : <div className="w-full h-full flex items-center justify-center text-2xl">{group?.icon || '🏃'}</div>
+        }
+        {/* Point couleur niveau — coin bas-gauche */}
+        <span className={`absolute bottom-1 left-1 w-2.5 h-2.5 rounded-full border border-black/30 ${dotColor}`}/>
+      </div>
+
+      {/* Contenu */}
+      <div className="flex-1 min-w-0 px-3 py-2 flex flex-col justify-center">
+        <p className={`text-sm font-medium truncate ${hasName ? 'text-white' : 'text-white/50 italic'}`}>
+          {hasName ? displayName : '⚠ À classifier'}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          {group
+            ? <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${GROUP_COLORS[ex.muscle_group_id] || 'bg-white/10 text-white/40'}`}>{group.name}</span>
+            : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/20">non classifié</span>
+          }
+          <span className="text-[10px] text-white/25">{DIFF_LABELS[score]}</span>
+          {classified && <span className="text-[10px] text-green-400/60">✓ IA</span>}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col justify-center gap-0 pr-2">
+        <button onClick={onEdit} className="text-white/30 hover:text-white p-1.5"><Edit2 size={13}/></button>
+        <button onClick={onDelete} className="text-red-400/40 hover:text-red-400 p-1.5"><Trash2 size={13}/></button>
+      </div>
+    </div>
+  )
+}
+
+function ExercisesSection({ store, availableVideos, editingEx, setEditingEx }) {
+  const [classifying, setClassifying] = useState(false)
+  const [classifyMsg, setClassifyMsg] = useState('')
+
+  async function handleClassifyAll() {
+    setClassifying(true)
+    setClassifyMsg('Extraction vignettes + analyse IA en cours…')
+    try {
+      // 1. Extraire vignettes ffmpeg
+      await fetch('https://newbody.nathaliebrigitte.com/api/exercises/extract-thumbnails', { method: 'POST' })
+      setClassifyMsg('Vignettes extraites — analyse Claude Vision…')
+      // 2. Classifier tout
+      await fetch('https://newbody.nathaliebrigitte.com/api/exercises/analyze-all', { method: 'POST' })
+      setClassifyMsg('✓ Classification lancée en arrière-plan — recharge dans 2 min')
+    } catch (e) {
+      setClassifyMsg('Erreur : ' + e.message)
+    } finally {
+      setClassifying(false)
+    }
+  }
+
+  const unclassified = store.exercises.filter(e => e.classification_status !== 'classified').length
+
+  return (
+    <div className="space-y-3">
+      <button onClick={() => setEditingEx('new')} className="btn-primary w-full flex items-center justify-center gap-2">
+        <Plus size={16}/> Nouvel exercice
+      </button>
+
+      {unclassified > 0 && (
+        <button onClick={handleClassifyAll} disabled={classifying}
+          className="w-full bg-purple-600/20 border border-purple-500/30 text-purple-300 rounded-xl px-4 py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-40">
+          🧠 {classifying ? classifyMsg : `Classifier automatiquement les ${unclassified} non classifiés`}
+        </button>
+      )}
+      {!classifying && classifyMsg && <p className="text-xs text-center text-white/40">{classifyMsg}</p>}
+
+      {editingEx === 'new' && (
+        <ExerciseForm muscleGroups={store.muscleGroups} availableVideos={availableVideos}
+          onSave={ex => { store.saveExercise(ex); setEditingEx(null) }}
+          onCancel={() => setEditingEx(null)}/>
+      )}
+
+      {store.exercises.map(ex => {
+        const group = store.muscleGroups.find(g => g.id === ex.muscle_group_id)
+        return (
+          <div key={ex.id}>
+            {editingEx === ex.id
+              ? <ExerciseForm exercise={ex} muscleGroups={store.muscleGroups} availableVideos={availableVideos}
+                  onSave={updated => { store.saveExercise(updated); setEditingEx(null) }}
+                  onCancel={() => setEditingEx(null)}/>
+              : <ExerciseCard ex={ex} group={group}
+                  onEdit={() => setEditingEx(ex.id)}
+                  onDelete={() => store.deleteExercise(ex.id)}/>
+            }
+          </div>
+        )
+      })}
     </div>
   )
 }
