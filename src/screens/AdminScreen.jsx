@@ -432,9 +432,12 @@ const GROUP_COLORS   = {
 
 function cleanExName(name) {
   if (!name) return '—'
+  let s = name
+  // Supprimer "X.XM views · XXK reactions | " (titres Facebook)
+  s = s.replace(/^[\d.,]+[KkMmBb]?\s+views?\s*[·•]\s*[\d.,]+[KkMmBb]?\s+reactions?\s*[|｜]\s*/i, '')
   // Supprimer le préfixe FDownloader.Net + hash
-  const cleaned = name.replace(/^FDownloader\.Net\s+[A-Za-z0-9_\-+=]{10,}\s*/i, '').trim()
-  return cleaned || name
+  s = s.replace(/^FDownloader\.Net\s+[A-Za-z0-9_\-+=]{10,}\s*/i, '')
+  return s.trim() || name
 }
 
 function ExerciseCard({ ex, group, onEdit, onDelete }) {
@@ -946,15 +949,17 @@ function ClassifySection() {
               {/* Header carte */}
               <button onClick={() => setExpanded(isOpen ? null : ex.id)}
                 className="w-full px-4 py-3 flex items-center gap-3 text-left">
-                {/* Miniature vidéo */}
-                <div className="w-12 h-10 rounded-lg bg-white/5 flex-shrink-0 overflow-hidden flex items-center justify-center">
-                  {ex.visual_count > 0
-                    ? <span className="text-orange-400 text-xs">{ex.visual_count} img</span>
-                    : <span className="text-white/20 text-xs">?</span>
+                {/* Miniature vidéo ou placeholder */}
+                <div className="w-12 h-10 rounded-lg bg-white/5 flex-shrink-0 overflow-hidden flex items-center justify-center relative">
+                  {ex.thumbnail_url
+                    ? <img src={ex.thumbnail_url.startsWith('http') ? ex.thumbnail_url : VPS + ex.thumbnail_url} alt="" className="w-full h-full object-cover"/>
+                    : ex.visual_count > 0
+                      ? <span className="text-orange-400 text-xs">{ex.visual_count} img</span>
+                      : <span className="text-white/20 text-xs">?</span>
                   }
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm truncate">{ex.name}</p>
+                  <p className="text-white text-sm truncate">{cleanExName(ex.name)}</p>
                   <p className="text-white/30 text-xs truncate">{ex.source_id || ex.source_url?.split('/').pop()}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -970,6 +975,18 @@ function ClassifySection() {
               {/* Contenu expandé */}
               {isOpen && (
                 <div className="border-t border-white/5 px-4 pb-4 pt-3 space-y-4">
+
+                  {/* Lien vidéo */}
+                  {ex.video_url && (
+                    <a
+                      href={ex.video_url.startsWith('http') ? ex.video_url : VPS + ex.video_url}
+                      target="_blank" rel="noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white px-4 py-2.5 rounded-xl text-sm transition-colors border border-white/10">
+                      <Play size={14} className="text-orange-400 flex-shrink-0"/>
+                      <span className="truncate">Voir la vidéo (pour screenshots)</span>
+                    </a>
+                  )}
 
                   {/* Upload visuels */}
                   <div>
