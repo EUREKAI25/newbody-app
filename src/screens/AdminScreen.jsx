@@ -107,10 +107,23 @@ function ExerciseForm({ exercise, muscleGroups, availableVideos, onSave, onCance
 
       <div>
         <label className="text-white/30 text-xs">Vidéo exercice</label>
-        <select value={form.video_url} onChange={f('video_url')} className="input-field w-full mt-1">
+        <select value={form.video_url}
+          onChange={e => {
+            const selected = availableVideos.find(v => VPS + v.url === e.target.value)
+            setForm(s => ({
+              ...s,
+              video_url: e.target.value,
+              ...(selected?.thumbnail_url && !s.thumbnail_url
+                ? { thumbnail_url: VPS + selected.thumbnail_url, media_url: VPS + selected.thumbnail_url }
+                : {}),
+            }))
+          }}
+          className="input-field w-full mt-1">
           <option value="">— aucune —</option>
           {availableVideos.map(v => (
-            <option key={v.filename} value={VPS + v.url}>{v.filename}</option>
+            <option key={v.filename} value={VPS + v.url}>
+              {v.name ? cleanExName(v.name) : v.filename}
+            </option>
           ))}
         </select>
         <input placeholder="ou URL manuelle" value={form.video_url} onChange={f('video_url')} className="input-field w-full mt-1"/>
