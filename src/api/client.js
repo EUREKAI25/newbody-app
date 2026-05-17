@@ -97,6 +97,41 @@ export const api = {
   // Videos list
   getVideos: () => req('GET', '/api/videos'),
 
+  // Classification IA
+  getUnclassified: () => req('GET', '/api/exercises/unclassified'),
+  getExerciseVisuals: (id) => req('GET', `/api/exercises/${id}/visuals`),
+  uploadVisuals: async (id, files) => {
+    const fd = new FormData()
+    files.forEach(f => fd.append('images', f))
+    const res = await fetch(BASE + `/api/exercises/${id}/visuals`, {
+      method: 'POST',
+      headers: { 'X-API-Key': apiKey },
+      body: fd,
+    })
+    if (!res.ok) throw new Error('Upload visuals échoué')
+    return res.json()
+  },
+  deleteVisuals: (id) => req('DELETE', `/api/exercises/${id}/visuals`),
+  analyzeExercise: (id) => req('POST', `/api/exercises/${id}/analyze`),
+  analyzeAll: () => req('POST', '/api/exercises/analyze-all'),
+
+  // Import vidéos
+  downloadUrl: (url, outputDir) => req('POST', '/api/videos/download-url', { url, ...(outputDir ? { outputDir } : {}) }),
+  importFromDb: () => req('POST', '/api/videos/import'),
+  importStatus: () => req('GET', '/api/videos/import-status'),
+  uploadUrlsFile: async (file, outputDir) => {
+    const fd = new FormData()
+    fd.append('urls_file', file)
+    if (outputDir) fd.append('outputDir', outputDir)
+    const res = await fetch(BASE + '/api/videos/import-file', {
+      method: 'POST',
+      headers: { 'X-API-Key': apiKey },
+      body: fd,
+    })
+    if (!res.ok) throw new Error('Upload échoué')
+    return res.json()
+  },
+
   // Upload
   upload: async (file) => {
     const fd = new FormData()
