@@ -965,7 +965,7 @@ function ClassifySection() {
 }
 
 // ── Section Import vidéos ─────────────────────────────────────────────────────
-const DEFAULT_VIDEOS_DIR = '/Users/nathalie/Dropbox/____BIG_BOFF___/PROJETS/PERSO/NEWBODY/_VIDEOS'
+const DEFAULT_VIDEOS_DIR = '/opt/newbody/data/uploads/videos'
 
 function ImportSection() {
   const [mode, setMode]         = useState('urls')   // 'urls' | 'file' | 'db'
