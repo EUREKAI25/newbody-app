@@ -228,9 +228,9 @@ export default function AdminScreen() {
         <p className="text-white/40 text-sm mb-8">Accès protégé</p>
         <input type="password" value={pwInput}
           onChange={e => setPwInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { if (pwInput === ADMIN_PASSWORD) { localStorage.setItem('newbody_admin_session', JSON.stringify({ expires: Date.now() + 7*24*60*60*1000 })); setAuth(true) } else alert('Mot de passe incorrect') }}}
+          onKeyDown={e => { if (e.key === 'Enter') { if (pwInput === ADMIN_PASSWORD) { localStorage.setItem('newbody_admin_session', JSON.stringify({ expires: Date.now() + 30*24*60*60*1000 })); setAuth(true) } else alert('Mot de passe incorrect') }}}
           placeholder="Mot de passe…" className="input-field w-full mb-3 text-center" autoFocus/>
-        <button onClick={() => { if (pwInput === ADMIN_PASSWORD) { localStorage.setItem('newbody_admin_session', JSON.stringify({ expires: Date.now() + 7*24*60*60*1000 })); setAuth(true) } else alert('Mot de passe incorrect') }} className="btn-primary w-full">Entrer</button>
+        <button onClick={() => { if (pwInput === ADMIN_PASSWORD) { localStorage.setItem('newbody_admin_session', JSON.stringify({ expires: Date.now() + 30*24*60*60*1000 })); setAuth(true) } else alert('Mot de passe incorrect') }} className="btn-primary w-full">Entrer</button>
         <button onClick={() => navigate(-1)} className="mt-4 text-white/30 text-sm">Retour</button>
       </div>
     )
