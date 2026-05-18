@@ -221,7 +221,7 @@ export default function AdminScreen() {
     } catch { return false }
   })
   const [pwInput, setPwInput] = useState('')
-  const [section, setSection] = useState('exercises')
+  const [section, setSection] = useState('classify')
   const [editingEx, setEditingEx] = useState(null)
   const [editingBonus, setEditingBonus] = useState(null)
   const [editingVisual, setEditingVisual] = useState(null)
@@ -990,20 +990,26 @@ function ClassifySection() {
                 <div className="border-t border-white/5 px-4 pb-4 pt-3 space-y-4">
 
                   {/* Lecteur vidéo inline — mettre en pause pour screenshot */}
-                  {ex.video_url && (
-                    <div className="rounded-xl overflow-hidden bg-black">
-                      <video
-                        src={ex.video_url.startsWith('http') ? ex.video_url : VPS + ex.video_url}
-                        controls
-                        playsInline
-                        preload="metadata"
-                        className="w-full max-h-48 object-contain"
-                      />
-                      <p className="text-white/30 text-xs px-3 py-1.5">
-                        ↑ Met en pause sur la position à capturer, puis prends un screenshot
-                      </p>
-                    </div>
-                  )}
+                  {ex.video_url && (() => {
+                    const raw = ex.video_url.startsWith('http') ? ex.video_url : VPS + ex.video_url
+                    // Décoder puis ré-encoder proprement pour éviter le double-encodage
+                    const videoSrc = (() => { try { return decodeURIComponent(raw) } catch { return raw } })()
+                    return (
+                      <div className="rounded-xl overflow-hidden bg-black">
+                        <video
+                          src={videoSrc}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full max-h-48 object-contain"
+                          onError={e => { if (!e.target.src.includes('%')) { e.target.src = raw } }}
+                        />
+                        <p className="text-white/30 text-xs px-3 py-1.5">
+                          ↑ Met en pause, prends un screenshot, puis uploade-le ci-dessous
+                        </p>
+                      </div>
+                    )
+                  })()}
 
                   {/* Upload visuels */}
                   <div>
