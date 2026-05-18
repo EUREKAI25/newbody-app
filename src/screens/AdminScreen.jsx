@@ -989,21 +989,25 @@ function ClassifySection() {
               {isOpen && (
                 <div className="border-t border-white/5 px-4 pb-4 pt-3 space-y-4">
 
-                  {/* Lien vidéo */}
+                  {/* Lecteur vidéo inline — mettre en pause pour screenshot */}
                   {ex.video_url && (
-                    <a
-                      href={ex.video_url.startsWith('http') ? ex.video_url : VPS + ex.video_url}
-                      target="_blank" rel="noreferrer"
-                      onClick={e => e.stopPropagation()}
-                      className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white px-4 py-2.5 rounded-xl text-sm transition-colors border border-white/10">
-                      <Play size={14} className="text-orange-400 flex-shrink-0"/>
-                      <span className="truncate">Voir la vidéo (pour screenshots)</span>
-                    </a>
+                    <div className="rounded-xl overflow-hidden bg-black">
+                      <video
+                        src={ex.video_url.startsWith('http') ? ex.video_url : VPS + ex.video_url}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="w-full max-h-48 object-contain"
+                      />
+                      <p className="text-white/30 text-xs px-3 py-1.5">
+                        ↑ Met en pause sur la position à capturer, puis prends un screenshot
+                      </p>
+                    </div>
                   )}
 
                   {/* Upload visuels */}
                   <div>
-                    <p className="text-white/40 text-xs mb-2">Visuels de séquence (2–4 images dans l'ordre)</p>
+                    <p className="text-white/40 text-xs mb-2">Visuels de séquence (2–4 screenshots dans l'ordre)</p>
                     <label className={`flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/8 rounded-xl px-4 py-3 border border-dashed border-white/10 transition-colors ${isUploading ? 'opacity-50' : ''}`}>
                       <Upload size={16} className="text-orange-400 flex-shrink-0"/>
                       <span className="text-sm text-white/50">
