@@ -352,7 +352,7 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
 
       {/* Media zone */}
       {isExercise && (
-        <div className="flex-shrink-0 h-44 bg-[#1a1a1a] overflow-hidden">
+        <div className="flex-shrink-0 bg-[#1a1a1a] overflow-hidden" style={{ height: 'clamp(200px, 45vh, 400px)' }}>
           <ExerciseMedia exercise={ex} loop className="w-full h-full object-cover" />
           {!ex?.video_url && !ex?.media_url && (
             <div className="w-full h-full flex items-center justify-center text-5xl">
@@ -484,6 +484,14 @@ export default function SessionScreen() {
       : activeExercises
     const shuffled = [...pool].sort(() => Math.random() - 0.5)
     launchGuided(shuffled.slice(0, Math.min(4, shuffled.length)))
+  }
+
+  function launchGuidedWith(mandatoryEx) {
+    const others = activeExercises
+      .filter(e => e.id !== mandatoryEx.id)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3)
+    launchGuided([mandatoryEx, ...others])
   }
 
   if (step === 'init') {
@@ -667,7 +675,7 @@ export default function SessionScreen() {
           return (
             <button
               key={ex.id}
-              onClick={() => launchGuided([ex])}
+              onClick={() => launchGuidedWith(ex)}
               className="w-full flex items-center gap-3 bg-[#1a1a1a] hover:bg-[#222] rounded-xl p-3 text-left transition-colors"
             >
               <div className="w-10 h-10 rounded-lg bg-orange-900/30 flex items-center justify-center text-lg flex-shrink-0 overflow-hidden">

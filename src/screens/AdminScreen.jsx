@@ -453,47 +453,86 @@ function cleanExName(name) {
   return s.trim() || name
 }
 
-function ExerciseCard({ ex, group, onEdit, onDelete }) {
-  const score  = ex.difficulty_score || ex.default_intensity || 2
-  const dotColor = DIFF_COLORS_EX[score] || 'bg-white/20'
+function ExerciseCard({ ex, group, onEdit, onDelete, isExpanded, onToggle }) {
+  const score     = ex.difficulty_score || ex.default_intensity || 2
+  const dotColor  = DIFF_COLORS_EX[score] || 'bg-white/20'
   const classified = ex.classification_status === 'classified'
-  const hasName = !ex.name?.startsWith('FDownloader')
+  const hasName   = !ex.name?.startsWith('FDownloader')
   const displayName = cleanExName(ex.name)
+  const [uploading, setUploading] = useState(false)
+  const [uploadMsg, setUploadMsg] = useState('')
+
+  async function handleUpload(files) {
+    if (!files.length) return
+    setUploading(true)
+    setUploadMsg('')
+    try {
+      await api.uploadVisuals(ex.id, Array.from(files))
+      setUploadMsg(`✓ ${files.length} visuel(s) uploadé(s)`)
+    } catch (e) { setUploadMsg('Échec : ' + e.message) }
+    setUploading(false)
+  }
+
+  const videoSrc = ex.video_url ? (() => {
+    const raw = ex.video_url.startsWith('http') ? ex.video_url : VPS + ex.video_url
+    try { return decodeURIComponent(raw) } catch { return raw }
+  })() : null
 
   return (
-    <div className={`bg-[#1a1a1a] rounded-xl overflow-hidden flex items-stretch gap-0 ${!ex.is_active ? 'opacity-40' : ''}`}>
-      {/* Vignette avec dot niveau */}
-      <div className="w-14 h-14 flex-shrink-0 relative bg-black/40">
-        {ex.thumbnail_url
-          ? <img src={ex.thumbnail_url.startsWith('http') ? ex.thumbnail_url : 'https://newbody.nathaliebrigitte.com' + ex.thumbnail_url} alt="" className="w-full h-full object-cover"/>
-          : ex.video_url
-            ? <video src={ex.video_url.startsWith('http') ? ex.video_url : 'https://newbody.nathaliebrigitte.com' + ex.video_url} className="w-full h-full object-cover" muted playsInline/>
-            : <div className="w-full h-full flex items-center justify-center text-2xl">{group?.icon || '🏃'}</div>
-        }
-        {/* Point couleur niveau — coin bas-gauche */}
-        <span className={`absolute bottom-1 left-1 w-2.5 h-2.5 rounded-full border border-black/30 ${dotColor}`}/>
-      </div>
-
-      {/* Contenu */}
-      <div className="flex-1 min-w-0 px-3 py-2 flex flex-col justify-center">
-        <p className={`text-sm font-medium truncate ${hasName ? 'text-white' : 'text-white/50 italic'}`}>
-          {hasName ? displayName : '⚠ À classifier'}
-        </p>
-        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          {group
-            ? <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${GROUP_COLORS[ex.muscle_group_id] || 'bg-white/10 text-white/40'}`}>{group.name}</span>
-            : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/20">non classifié</span>
+    <div className={`bg-[#1a1a1a] rounded-xl overflow-hidden ${!ex.is_active ? 'opacity-40' : ''}`}>
+      {/* Ligne principale */}
+      <div className="flex items-stretch gap-0 cursor-pointer" onClick={onToggle}>
+        {/* Vignette */}
+        <div className="w-14 h-14 flex-shrink-0 relative bg-black/40">
+          {ex.thumbnail_url
+            ? <img src={ex.thumbnail_url.startsWith('http') ? ex.thumbnail_url : VPS + ex.thumbnail_url} alt="" className="w-full h-full object-cover"/>
+            : ex.video_url
+              ? <video src={videoSrc} className="w-full h-full object-cover" muted playsInline/>
+              : <div className="w-full h-full flex items-center justify-center text-2xl">{group?.icon || '🏃'}</div>
           }
-          <span className="text-[10px] text-white/25">{DIFF_LABELS[score]}</span>
-          {classified && <span className="text-[10px] text-green-400/60">✓ IA</span>}
+          <span className={`absolute bottom-1 left-1 w-2.5 h-2.5 rounded-full border border-black/30 ${dotColor}`}/>
+        </div>
+
+        {/* Contenu */}
+        <div className="flex-1 min-w-0 px-3 py-2 flex flex-col justify-center">
+          <p className={`text-sm font-medium truncate ${hasName ? 'text-white' : 'text-white/50 italic'}`}>
+            {hasName ? displayName : '⚠ À classifier'}
+          </p>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            {group
+              ? <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${GROUP_COLORS[ex.muscle_group_id] || 'bg-white/10 text-white/40'}`}>{group.name}</span>
+              : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/20">non classifié</span>
+            }
+            <span className="text-[10px] text-white/25">{DIFF_LABELS[score]}</span>
+            {classified && <span className="text-[10px] text-green-400/60">✓ IA</span>}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col justify-center gap-0 pr-2" onClick={e => e.stopPropagation()}>
+          <button onClick={onEdit} className="text-white/30 hover:text-white p-1.5"><Edit2 size={13}/></button>
+          <button onClick={onDelete} className="text-red-400/40 hover:text-red-400 p-1.5"><Trash2 size={13}/></button>
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-col justify-center gap-0 pr-2">
-        <button onClick={onEdit} className="text-white/30 hover:text-white p-1.5"><Edit2 size={13}/></button>
-        <button onClick={onDelete} className="text-red-400/40 hover:text-red-400 p-1.5"><Trash2 size={13}/></button>
-      </div>
+      {/* Section expandée — vidéo + upload IA */}
+      {isExpanded && (
+        <div className="border-t border-white/5 p-3 space-y-3">
+          {videoSrc && (
+            <div className="rounded-lg overflow-hidden bg-black">
+              <video src={videoSrc} controls playsInline preload="metadata"
+                className="w-full max-h-64 object-contain"/>
+            </div>
+          )}
+          <label className={`flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/8 rounded-xl px-4 py-3 border border-dashed border-white/10 transition-colors ${uploading ? 'opacity-50' : ''}`}>
+            <Upload size={15} className="text-orange-400 flex-shrink-0"/>
+            <span className="text-sm text-white/50">{uploading ? 'Upload…' : 'Uploader visuels pour IA (2–4 screenshots)'}</span>
+            <input type="file" accept="image/*" multiple className="hidden" disabled={uploading}
+              onChange={e => handleUpload(e.target.files)}/>
+          </label>
+          {uploadMsg && <p className={`text-xs ${uploadMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{uploadMsg}</p>}
+        </div>
+      )}
     </div>
   )
 }
@@ -501,6 +540,7 @@ function ExerciseCard({ ex, group, onEdit, onDelete }) {
 function ExercisesSection({ store, availableVideos, editingEx, setEditingEx }) {
   const [classifying, setClassifying] = useState(false)
   const [classifyMsg, setClassifyMsg] = useState('')
+  const [expandedEx, setExpandedEx] = useState(null)
 
   async function handleClassifyAll() {
     setClassifying(true)
@@ -551,7 +591,9 @@ function ExercisesSection({ store, availableVideos, editingEx, setEditingEx }) {
                   onCancel={() => setEditingEx(null)}/>
               : <ExerciseCard ex={ex} group={group}
                   onEdit={() => setEditingEx(ex.id)}
-                  onDelete={() => store.deleteExercise(ex.id)}/>
+                  onDelete={() => store.deleteExercise(ex.id)}
+                  isExpanded={expandedEx === ex.id}
+                  onToggle={() => setExpandedEx(expandedEx === ex.id ? null : ex.id)}/>
             }
           </div>
         )
