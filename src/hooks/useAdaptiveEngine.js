@@ -16,10 +16,9 @@ export function useAdaptiveEngine() {
     const profile = {
       level_estimate: 1,
       energy_level: 3,
-      recovery_mode: false,
       equipment_list: [],
-      max_intensity_allowed: 3,
-      max_cardio_allowed: 2,
+      max_intensity_allowed: 5,
+      max_cardio_allowed: 5,
       work_sec_base: 40,
       rest_sec_base: 20,
       ...trainingProfile,
@@ -27,7 +26,7 @@ export function useAdaptiveEngine() {
 
     let work_sec = Number(profile.work_sec_base) || 40
     let rest_sec = Number(profile.rest_sec_base) || 20
-    let max_cardio = Number(profile.max_cardio_allowed) || 2
+    let max_cardio = Number(profile.max_cardio_allowed) || 5
 
     const energy_today = todayCheckin?.energy ?? 3
     const cardio_readiness = todayCheckin?.cardio_readiness ?? 3
@@ -43,7 +42,7 @@ export function useAdaptiveEngine() {
       ? recentFeedbacks.reduce((s, f) => s + (f.muscular_difficulty ?? 3), 0) / recentFeedbacks.length
       : 3
 
-    // Too much cardio or low readiness → soften
+    // Too much cardio or low readiness → soften timing
     if (avg_cardio_diff >= 4 || cardio_readiness <= 2) {
       work_sec = Math.round(work_sec * (1 - cfg.adjust_step_percent))
       rest_sec = Math.round(rest_sec * (1 + cfg.rest_adjust_percent))
@@ -55,15 +54,15 @@ export function useAdaptiveEngine() {
       work_sec = Math.round(work_sec * (1 + cfg.adjust_step_percent))
     }
 
-    // Low energy today → gentle mode
-    const isGentleMode = energy_today <= 2 || profile.recovery_mode
+    // Low energy today → gentle mode (energy check-in driven, no manual toggle)
+    const isGentleMode = energy_today <= 2
     if (isGentleMode) {
       work_sec = Math.round(work_sec * 0.85)
       rest_sec = Math.round(rest_sec * 1.20)
       max_cardio = Math.max(1, max_cardio - 1)
     }
 
-    // Clamp
+    // Clamp timing
     work_sec = Math.max(cfg.min_work_sec, Math.min(cfg.max_work_sec, work_sec))
     rest_sec = Math.max(cfg.min_rest_sec, Math.min(cfg.max_rest_sec, rest_sec))
     max_cardio = Math.min(max_cardio, cfg.max_cardio_allowed)
@@ -73,16 +72,19 @@ export function useAdaptiveEngine() {
       rest_sec = Math.max(cfg.min_rest_sec, Math.floor(work_sec * 0.5))
     }
 
+    // Level cap: user's mastered level, lowered by 1 when fatigued (never below 1)
+    const userLevel = profile.level_estimate || 1
+    const levelCap = isGentleMode ? Math.max(1, userLevel - 1) : userLevel
+
     // Filter exercises
     const availableEquipment = Array.isArray(profile.equipment_list) ? profile.equipment_list : []
     const pool = exercises.filter(ex => {
       if (!ex.is_active) return false
       const cardio = Number(ex.default_cardio ?? 2)
-      const intensity = Number(ex.default_intensity ?? 3)
       if (cardio > max_cardio) return false
-      if (intensity > Number(profile.max_intensity_allowed)) return false
-      // gentle mode: skip beginner_friendly check if no exercises have it set
-      if (isGentleMode && ex.beginner_friendly === false) return false
+      // Level filter: exercises with no score are always included
+      const score = Number(ex.difficulty_score ?? 0)
+      if (score > 0 && score > levelCap) return false
       try {
         const needed = typeof ex.equipment_needed === 'string'
           ? JSON.parse(ex.equipment_needed || '[]')

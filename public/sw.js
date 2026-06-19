@@ -3,7 +3,11 @@
 const DB_KEY = 'newbody_reminders'
 
 self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()))
+self.addEventListener('activate', e => e.waitUntil(
+  caches.keys()
+    .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+    .then(() => self.clients.claim())
+))
 
 // Receive a message from the app to schedule reminders
 self.addEventListener('message', async (event) => {

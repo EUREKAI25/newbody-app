@@ -488,6 +488,7 @@ export default function SessionScreen() {
   const activeExercises = exercises.filter(e => e.is_active)
   const allZones = [...new Set(activeExercises.flatMap(e => parseZones(e)))].sort()
   const hasUnclassified = activeExercises.some(e => parseZones(e).length === 0)
+  const userLevel = trainingProfile?.level_estimate || 1
   function zonePool(exList) {
     if (selectedZone === null) return exList
     if (selectedZone === '__unclassified__') return exList.filter(e => parseZones(e).length === 0)
@@ -498,7 +499,13 @@ export default function SessionScreen() {
     if (complexityFilter === 'simple') return exList.filter(e => parseZones(e).length === 1)
     return exList.filter(e => parseZones(e).length >= 2)
   }
-  function activePool() { return complexityPool(zonePool(activeExercises)) }
+  function levelPool(exList) {
+    return exList.filter(ex => {
+      const score = Number(ex.difficulty_score ?? 0)
+      return score === 0 || score <= userLevel
+    })
+  }
+  function activePool() { return levelPool(complexityPool(zonePool(activeExercises))) }
   const filteredExercises = [...activePool()].sort((a, b) => {
     const da = a.difficulty_score ?? 999
     const db = b.difficulty_score ?? 999

@@ -644,25 +644,17 @@ function ProfileSection({ store }) {
   return (
     <div className="bg-[#1a1a1a] rounded-2xl p-4 space-y-4">
       <p className="text-white font-semibold">Profil d'entraînement</p>
-      <SliderField label="Niveau estimé (1=débutante, 5=sportive)" value={form.level_estimate || 1} onChange={n('level_estimate')} min={1} max={5}/>
-      <SliderField label="Intensité max autorisée" value={form.max_intensity_allowed || 3} onChange={n('max_intensity_allowed')} min={1} max={5}/>
-      <SliderField label="Cardio max autorisé" value={form.max_cardio_allowed || 2} onChange={n('max_cardio_allowed')} min={1} max={5}/>
+      <SliderField label="Mon niveau (1=débutante → 5=athlète)" value={form.level_estimate || 1} onChange={n('level_estimate')} min={1} max={5}/>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-white/40 text-xs">Durée travail (sec)</label>
-          <input type="number" value={form.work_sec_base || 25} onChange={e => setForm(s => ({ ...s, work_sec_base: Number(e.target.value) }))} className="input-field w-full"/>
+          <input type="text" inputMode="numeric" value={form.work_sec_base || 40} onChange={e => setForm(s => ({ ...s, work_sec_base: Number(e.target.value) }))} className="input-field w-full"/>
         </div>
         <div>
           <label className="text-white/40 text-xs">Durée repos (sec)</label>
-          <input type="number" value={form.rest_sec_base || 35} onChange={e => setForm(s => ({ ...s, rest_sec_base: Number(e.target.value) }))} className="input-field w-full"/>
+          <input type="text" inputMode="numeric" value={form.rest_sec_base || 20} onChange={e => setForm(s => ({ ...s, rest_sec_base: Number(e.target.value) }))} className="input-field w-full"/>
         </div>
       </div>
-      <label className="flex items-center gap-2 text-white/60 text-sm">
-        <input type="checkbox" checked={Boolean(form.recovery_mode)}
-          onChange={e => setForm(s => ({ ...s, recovery_mode: e.target.checked }))}
-          className="accent-orange-500"/>
-        Mode récupération (séances très douces)
-      </label>
       <button onClick={() => store.saveTrainingProfile(form)} className="btn-primary w-full flex items-center justify-center gap-1">
         <Save size={14}/> Enregistrer profil
       </button>
@@ -689,16 +681,16 @@ function AdaptiveSection({ store }) {
         ].map(({ k, label }) => (
           <div key={k}>
             <label className="text-white/40 text-xs">{label}</label>
-            <input type="number" value={form[k] || 0} onChange={n(k)} className="input-field w-full"/>
+            <input type="text" inputMode="numeric" value={form[k] || 0} onChange={n(k)} className="input-field w-full"/>
           </div>
         ))}
         <div>
           <label className="text-white/40 text-xs">Ajust. travail (%)</label>
-          <input type="number" step="0.01" value={form.adjust_step_percent || 0.1} onChange={e => setForm(s => ({ ...s, adjust_step_percent: Number(e.target.value) }))} className="input-field w-full"/>
+          <input type="text" inputMode="decimal" value={form.adjust_step_percent || 0.1} onChange={e => setForm(s => ({ ...s, adjust_step_percent: Number(e.target.value) }))} className="input-field w-full"/>
         </div>
         <div>
           <label className="text-white/40 text-xs">Ajust. repos (%)</label>
-          <input type="number" step="0.01" value={form.rest_adjust_percent || 0.15} onChange={e => setForm(s => ({ ...s, rest_adjust_percent: Number(e.target.value) }))} className="input-field w-full"/>
+          <input type="text" inputMode="decimal" value={form.rest_adjust_percent || 0.15} onChange={e => setForm(s => ({ ...s, rest_adjust_percent: Number(e.target.value) }))} className="input-field w-full"/>
         </div>
       </div>
       <button onClick={() => store.saveAdaptiveConfig(form)} className="btn-primary w-full flex items-center justify-center gap-1">
