@@ -6,6 +6,7 @@ import { useReminders } from '../hooks/useReminders'
 import { useAudio, getAudioConfig, saveAudioConfig } from '../hooks/useAudio'
 import { api } from '../api/client'
 import { nanoid } from '../hooks/nanoid'
+import { ACCESSORIES } from '../data/vocabulary.js'
 
 const VPS = 'https://newbody.nathaliebrigitte.com'
 const ADMIN_PASSWORD = 'zorbec'
@@ -641,6 +642,12 @@ function ProfileSection({ store }) {
   const [form, setForm] = useState(store.trainingProfile)
   const n = k => v => setForm(s => ({ ...s, [k]: v }))
 
+  function toggleAccessory(slug) {
+    const list = Array.isArray(form.equipment_list) ? form.equipment_list : []
+    const updated = list.includes(slug) ? list.filter(s => s !== slug) : [...list, slug]
+    setForm(s => ({ ...s, equipment_list: updated }))
+  }
+
   return (
     <div className="bg-[#1a1a1a] rounded-2xl p-4 space-y-4">
       <p className="text-white font-semibold">Profil d'entraînement</p>
@@ -654,6 +661,23 @@ function ProfileSection({ store }) {
           <label className="text-white/40 text-xs">Durée repos (sec)</label>
           <input type="text" inputMode="numeric" value={form.rest_sec_base || 20} onChange={e => setForm(s => ({ ...s, rest_sec_base: Number(e.target.value) }))} className="input-field w-full"/>
         </div>
+      </div>
+      <div>
+        <p className="text-white/40 text-xs mb-2">Mes accessoires disponibles</p>
+        <div className="flex flex-wrap gap-3">
+          {ACCESSORIES.map(acc => (
+            <label key={acc.slug} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={(form.equipment_list || []).includes(acc.slug)}
+                onChange={() => toggleAccessory(acc.slug)}
+                className="accent-orange-500 w-4 h-4"
+              />
+              <span className="text-white/70 text-sm">{acc.label}</span>
+            </label>
+          ))}
+        </div>
+        <p className="text-white/20 text-xs mt-1.5">Les contextes (mur, chaise, tapis…) sont considérés toujours disponibles.</p>
       </div>
       <button onClick={() => store.saveTrainingProfile(form)} className="btn-primary w-full flex items-center justify-center gap-1">
         <Save size={14}/> Enregistrer profil

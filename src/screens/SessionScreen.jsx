@@ -3,7 +3,8 @@ import { useStore } from '../store/useStore.jsx'
 import { useAudio, useSessionMusic, getAudioConfig } from '../hooks/useAudio.js'
 import { useAdaptiveEngine } from '../hooks/useAdaptiveEngine.js'
 import { nanoid } from '../hooks/nanoid'
-import { Pause, Play, X, Check, ChevronDown, ChevronUp, Plus, Volume2, VolumeX } from 'lucide-react'
+import { Pause, Play, X, Check, ChevronDown, ChevronUp, Plus, Volume2, VolumeX, Lock } from 'lucide-react'
+import { ACCESSORIES, CONTEXTS } from '../data/vocabulary.js'
 
 const VPS = 'https://newbody.nathaliebrigitte.com'
 
@@ -382,9 +383,10 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
                     <div className="w-full h-full flex items-center justify-center text-2xl">💪</div>
                   )}
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-white/40 text-xs">Prochain exercice</p>
                   <p className="text-white font-semibold text-sm">{nextEx.name}</p>
+                  <EquipmentChips ex={nextEx} />
                 </div>
               </div>
             )}
@@ -424,6 +426,48 @@ function parseZones(ex) {
     const z = JSON.parse(ex.zones_json)
     return Array.isArray(z) ? z : []
   } catch { return [] }
+}
+
+function parseEquipment(ex) {
+  try {
+    const v = typeof ex.equipment_needed === 'string'
+      ? JSON.parse(ex.equipment_needed || '[]')
+      : (ex.equipment_needed || [])
+    return Array.isArray(v) ? v.filter(e => e && e !== 'none' && e !== '') : []
+  } catch { return [] }
+}
+
+function parseContext(ex) {
+  try {
+    const v = typeof ex.context_json === 'string'
+      ? JSON.parse(ex.context_json || '[]')
+      : (ex.context_json || [])
+    return Array.isArray(v) ? v.filter(e => e && e !== 'aucun') : []
+  } catch { return [] }
+}
+
+function isAccessible(ex, ownedAccessories) {
+  const needed = parseEquipment(ex)
+  if (needed.length === 0) return true
+  return needed.every(a => ownedAccessories.includes(a))
+}
+
+function EquipmentChips({ ex }) {
+  const accessories = parseEquipment(ex)
+  const contexts    = parseContext(ex)
+  if (accessories.length === 0 && contexts.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {accessories.map(slug => {
+        const label = ACCESSORIES.find(a => a.slug === slug)?.label || slug
+        return <span key={slug} className="text-[10px] px-1.5 py-0.5 bg-amber-500/25 text-amber-300 rounded-full">{label}</span>
+      })}
+      {contexts.map(slug => {
+        const label = CONTEXTS.find(c => c.slug === slug)?.label || slug
+        return <span key={slug} className="text-[10px] px-1.5 py-0.5 bg-sky-500/15 text-sky-300 rounded-full">{label}</span>
+      })}
+    </div>
+  )
 }
 
 function SessionRecap({ exerciseIds, allExercises }) {
@@ -558,14 +602,16 @@ export default function SessionScreen() {
   }
 
   function startRandom() {
-    const pool = activePool()
+    const owned = trainingProfile?.equipment_list || []
+    const pool = activePool().filter(ex => isAccessible(ex, owned))
     const shuffled = [...pool].sort(() => Math.random() - 0.5)
     launchGuided(shuffled.slice(0, Math.min(4, shuffled.length)))
   }
 
   function launchGuidedWith(mandatoryEx) {
+    const owned = trainingProfile?.equipment_list || []
     const others = activePool()
-      .filter(e => e.id !== mandatoryEx.id)
+      .filter(e => e.id !== mandatoryEx.id && isAccessible(e, owned))
       .sort(() => Math.random() - 0.5)
       .slice(0, 3)
     launchGuided([mandatoryEx, ...others])
@@ -792,13 +838,18 @@ export default function SessionScreen() {
         </div>
         {filteredExercises.map(ex => {
           const zones = parseZones(ex)
+          const owned = trainingProfile?.equipment_list || []
+          const accessible = isAccessible(ex, owned)
           return (
             <button
               key={ex.id}
-              onClick={() => launchGuidedWith(ex)}
-              className="w-full flex items-center gap-3 bg-[#1a1a1a] hover:bg-[#222] rounded-xl p-3 text-left transition-colors"
+              onClick={accessible ? () => launchGuidedWith(ex) : undefined}
+              disabled={!accessible}
+              className={`w-full flex items-start gap-3 bg-[#1a1a1a] rounded-xl p-3 text-left transition-colors ${
+                accessible ? 'hover:bg-[#222]' : 'opacity-40 cursor-not-allowed'
+              }`}
             >
-              <div className="w-10 h-10 rounded-lg bg-orange-900/30 flex items-center justify-center text-lg flex-shrink-0 overflow-hidden">
+              <div className="w-10 h-10 mt-0.5 rounded-lg bg-orange-900/30 flex items-center justify-center text-lg flex-shrink-0 overflow-hidden">
                 {ex.video_url || ex.media_url
                   ? <ExerciseMedia exercise={ex} loop={false} className="w-full h-full object-cover" />
                   : '💪'
@@ -810,8 +861,12 @@ export default function SessionScreen() {
                   {zones.length > 0 ? zones.slice(0, 2).join(', ') : 'Non classé'}
                   {ex.difficulty_score ? ` · niv. ${ex.difficulty_score}/5` : ''}
                 </p>
+                <EquipmentChips ex={ex} />
               </div>
-              <Plus size={16} className="text-orange-400 flex-shrink-0" />
+              {accessible
+                ? <Plus size={16} className="text-orange-400 flex-shrink-0 mt-1" />
+                : <Lock size={14} className="text-white/20 flex-shrink-0 mt-1" />
+              }
             </button>
           )
         })}
