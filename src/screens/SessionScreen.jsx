@@ -12,6 +12,11 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function formatTime(sec) {
+  const s = Math.max(0, sec)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
 // ── Sliders helper ─────────────────────────────────────────────────────────
 function SliderRow({ label, value, onChange, min = 1, max = 5, low, high }) {
   return (
@@ -179,7 +184,19 @@ function TimerCircle({ timeLeft, total, phase }) {
 }
 
 // ── Video / thumbnail ────────────────────────────────────────────────────────
-function ExerciseMedia({ exercise, loop = true, className = '' }) {
+function ExerciseMedia({ exercise, loop = true, className = '', paused = false }) {
+  const videoRef = useRef(null)
+
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    if (paused) {
+      v.pause()
+    } else {
+      v.play().catch(() => {})
+    }
+  }, [paused])
+
   const url = exercise?.video_url
     ? (exercise.video_url.startsWith('http') ? exercise.video_url : VPS + exercise.video_url)
     : null
@@ -190,6 +207,7 @@ function ExerciseMedia({ exercise, loop = true, className = '' }) {
   if (url) {
     return (
       <video
+        ref={videoRef}
         key={url}
         src={url}
         autoPlay
@@ -217,6 +235,10 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
   const [paused, setPaused] = useState(false)
   const [musicMuted, setMusicMuted] = useState(() => !getAudioConfig().music_enabled)
   const [sessionId] = useState(nanoid())
+
+  const totalSessionSec = sequence.reduce((s, item) => s + item.duration_sec, 0)
+  const sessionTimerRef = useRef(totalSessionSec)
+  const [sessionTimeLeft, setSessionTimeLeft] = useState(totalSessionSec)
 
   const timerRef = useRef(null)
   const seqIdxRef = useRef(0)
@@ -259,6 +281,32 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
     playStartBeep()
     timerRef.current = setInterval(() => {
       if (pausedRef.current) return
+
+      // Compteur global séance
+      sessionTimerRef.current = Math.max(0, sessionTimerRef.current - 1)
+      setSessionTimeLeft(sessionTimerRef.current)
+      if (sessionTimerRef.current <= 0) {
+        clearInterval(timerRef.current)
+        playEndSession()
+        music.stopMusic(true)
+        const exercises = sequenceRef.current
+          .filter(s => s.type === 'exercise')
+          .map(s => s.exercise?.id)
+          .filter(Boolean)
+        addSession({
+          id: sessionId,
+          date: today(),
+          status: 'completed',
+          source: 'guided',
+          completed_at: new Date().toISOString(),
+          exercises,
+          done_count: exercises.length,
+        })
+        onFinish(sessionId, exercises)
+        return
+      }
+
+      // Minuteur d'intervalle exercice/repos
       setTimeLeft(t => {
         const next = t - 1
         if (next <= 5 && next > 0) playShortBeep()
@@ -351,11 +399,32 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
         </div>
       </div>
 
+      {/* Compteur global séance + bouton pause */}
+      <div className="px-4 pb-3 flex items-center justify-between flex-shrink-0">
+        <button
+          onClick={togglePause}
+          className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/15 flex items-center justify-center transition-colors flex-shrink-0"
+          aria-label={paused ? 'Reprendre' : 'Pause'}
+        >
+          {paused ? <Play size={16} className="text-white ml-0.5"/> : <Pause size={16} className="text-white"/>}
+        </button>
+        <div className="text-center">
+          <p className={`text-3xl font-bold tabular-nums transition-colors ${sessionTimeLeft <= 30 ? 'text-red-400' : 'text-white'}`}>
+            {formatTime(sessionTimeLeft)}
+          </p>
+          <p className="text-white/20 text-[10px] uppercase tracking-wider">séance</p>
+        </div>
+        {paused
+          ? <span className="text-white/30 text-xs animate-pulse w-10 text-right">pause</span>
+          : <div className="w-10" />
+        }
+      </div>
+
       {/* Media zone — portrait container to show full vertical frame */}
       {isExercise && (
         <div className="flex-shrink-0 bg-black flex justify-center overflow-hidden">
           <div style={{ height: 'clamp(280px, 58vh, 520px)', aspectRatio: '9/16', overflow: 'hidden', position: 'relative' }}>
-            <ExerciseMedia exercise={ex} loop className="w-full h-full object-contain" />
+            <ExerciseMedia exercise={ex} loop paused={paused} className="w-full h-full object-contain" />
             {!ex?.video_url && !ex?.media_url && (
               <div className="w-full h-full flex items-center justify-center text-5xl">
                 💪
@@ -394,25 +463,15 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
         )}
 
         <TimerCircle timeLeft={timeLeft} total={total} phase={current?.type} />
-
-        {paused && (
-          <p className="text-white/30 text-sm mt-3 animate-pulse">En pause…</p>
-        )}
       </div>
 
-      {/* Controls */}
-      <div className="px-6 pb-10 flex gap-3 flex-shrink-0">
-        <button
-          onClick={togglePause}
-          className="flex-1 bg-white/10 hover:bg-white/15 text-white font-semibold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors"
-        >
-          {paused ? <><Play size={18}/> Reprendre</> : <><Pause size={18}/> Pause</>}
-        </button>
+      {/* Controls — abandon uniquement, pause déplacée sur le compteur global */}
+      <div className="px-6 pb-10 flex-shrink-0">
         <button
           onClick={handleAbandon}
-          className="w-14 bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 rounded-2xl flex items-center justify-center transition-colors"
+          className="w-full bg-white/5 hover:bg-red-500/20 text-white/30 hover:text-red-400 py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors text-sm"
         >
-          <X size={18}/>
+          <X size={15}/> Arrêter la séance
         </button>
       </div>
     </div>
