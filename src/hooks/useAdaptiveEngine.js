@@ -10,6 +10,7 @@ export function useAdaptiveEngine() {
       max_work_sec: 60,
       min_rest_sec: 10,
       max_rest_sec: 60,
+      target_session_sec: 300,
       ...adaptiveConfig,
     }
     const profile = {
@@ -19,13 +20,13 @@ export function useAdaptiveEngine() {
       equipment_list: [],
       max_intensity_allowed: 3,
       max_cardio_allowed: 2,
-      work_sec_base: 25,
-      rest_sec_base: 35,
+      work_sec_base: 40,
+      rest_sec_base: 20,
       ...trainingProfile,
     }
 
-    let work_sec = Number(profile.work_sec_base) || 25
-    let rest_sec = Number(profile.rest_sec_base) || 35
+    let work_sec = Number(profile.work_sec_base) || 40
+    let rest_sec = Number(profile.rest_sec_base) || 20
     let max_cardio = Number(profile.max_cardio_allowed) || 2
 
     const energy_today = todayCheckin?.energy ?? 3
@@ -67,6 +68,11 @@ export function useAdaptiveEngine() {
     rest_sec = Math.max(cfg.min_rest_sec, Math.min(cfg.max_rest_sec, rest_sec))
     max_cardio = Math.min(max_cardio, cfg.max_cardio_allowed)
 
+    // Guard: rest must stay below work (handles legacy stored profiles with inverted ratio)
+    if (rest_sec >= work_sec) {
+      rest_sec = Math.max(cfg.min_rest_sec, Math.floor(work_sec * 0.5))
+    }
+
     // Filter exercises
     const availableEquipment = Array.isArray(profile.equipment_list) ? profile.equipment_list : []
     const pool = exercises.filter(ex => {
@@ -75,7 +81,8 @@ export function useAdaptiveEngine() {
       const intensity = Number(ex.default_intensity ?? 3)
       if (cardio > max_cardio) return false
       if (intensity > Number(profile.max_intensity_allowed)) return false
-      if (isGentleMode && !ex.beginner_friendly) return false
+      // gentle mode: skip beginner_friendly check if no exercises have it set
+      if (isGentleMode && ex.beginner_friendly === false) return false
       try {
         const needed = typeof ex.equipment_needed === 'string'
           ? JSON.parse(ex.equipment_needed || '[]')
@@ -87,31 +94,29 @@ export function useAdaptiveEngine() {
       return true
     })
 
-    // Select exercises alternating muscle groups
-    const groupOrder = ['fessiers', 'ventre', 'abdos_profond', 'cuisses', 'bras', 'dos', 'hanches', 'mobilite', 'etirements', 'corps_global']
-    const TARGET = isGentleMode ? 3 : 4
-    const selected = []
+    if (pool.length === 0) return { sequence: [], work_sec, rest_sec, max_cardio, isGentleMode }
+
+    // Compute how many exercise slots needed to fill target duration
+    // N * work + (N-1) * rest = target  →  N = ceil((target + rest) / (work + rest))
+    const target_sec = cfg.target_session_sec || 300
+    const interval_sec = work_sec + rest_sec
+    const N = Math.ceil((target_sec + rest_sec) / interval_sec)
+
+    // Build circuit from shuffled pool (capped for variety)
     const shuffled = [...pool].sort(() => Math.random() - 0.5)
+    const circuitSize = Math.min(shuffled.length, isGentleMode ? 4 : 6)
+    const circuit = shuffled.slice(0, circuitSize)
 
-    for (const group of groupOrder) {
-      if (selected.length >= TARGET) break
-      const pick = shuffled.find(e => e.muscle_group_id === group && !selected.includes(e))
-      if (pick) selected.push(pick)
-    }
-    // Fill remaining if needed
-    for (const ex of shuffled) {
-      if (selected.length >= TARGET) break
-      if (!selected.includes(ex)) selected.push(ex)
-    }
-
-    // Build sequence: exercise / rest / exercise / rest / ...
+    // Fill N slots by cycling through circuit
     const sequence = []
-    selected.forEach((ex, i) => {
+    for (let i = 0; i < N; i++) {
+      const ex = circuit[i % circuit.length]
+      const nextEx = circuit[(i + 1) % circuit.length]
       sequence.push({ type: 'exercise', exercise: ex, duration_sec: work_sec })
-      if (i < selected.length - 1) {
-        sequence.push({ type: 'rest', nextExercise: selected[i + 1], duration_sec: rest_sec })
+      if (i < N - 1) {
+        sequence.push({ type: 'rest', nextExercise: nextEx, duration_sec: rest_sec })
       }
-    })
+    }
 
     return { sequence, work_sec, rest_sec, max_cardio, isGentleMode }
   }

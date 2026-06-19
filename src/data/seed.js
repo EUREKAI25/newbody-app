@@ -164,8 +164,8 @@ export const DEFAULT_TRAINING_PROFILE = {
   dumbbell_weights: [],
   max_intensity_allowed: 3,
   max_cardio_allowed: 2,
-  work_sec_base: 25,
-  rest_sec_base: 35,
+  work_sec_base: 40,
+  rest_sec_base: 20,
 }
 
 export const DEFAULT_ADAPTIVE_CONFIG = {
@@ -178,4 +178,5 @@ export const DEFAULT_ADAPTIVE_CONFIG = {
   max_work_sec: 60,
   min_rest_sec: 10,
   max_rest_sec: 60,
+  target_session_sec: 300,
 }

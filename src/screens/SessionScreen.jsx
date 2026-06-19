@@ -242,7 +242,7 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
         exercises,
         done_count: exercises.length,
       })
-      onFinish(sessionId)
+      onFinish(sessionId, exercises)
       return
     }
     seqIdxRef.current = nextIdx
@@ -350,15 +350,17 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
         </div>
       </div>
 
-      {/* Media zone */}
+      {/* Media zone — portrait container to show full vertical frame */}
       {isExercise && (
-        <div className="flex-shrink-0 bg-[#1a1a1a] overflow-hidden" style={{ height: 'clamp(200px, 45vh, 400px)' }}>
-          <ExerciseMedia exercise={ex} loop className="w-full h-full object-cover" />
-          {!ex?.video_url && !ex?.media_url && (
-            <div className="w-full h-full flex items-center justify-center text-5xl">
-              💪
-            </div>
-          )}
+        <div className="flex-shrink-0 bg-black flex justify-center overflow-hidden">
+          <div style={{ height: 'clamp(280px, 58vh, 520px)', aspectRatio: '9/16', overflow: 'hidden', position: 'relative' }}>
+            <ExerciseMedia exercise={ex} loop className="w-full h-full object-contain" />
+            {!ex?.video_url && !ex?.media_url && (
+              <div className="w-full h-full flex items-center justify-center text-5xl">
+                💪
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -424,6 +426,46 @@ function parseZones(ex) {
   } catch { return [] }
 }
 
+function SessionRecap({ exerciseIds, allExercises }) {
+  if (!exerciseIds || exerciseIds.length === 0) return null
+  const exList = exerciseIds.map(id => allExercises.find(e => e.id === id)).filter(Boolean)
+  if (exList.length === 0) return null
+
+  const zoneCounts = {}
+  exList.forEach(ex => {
+    parseZones(ex).forEach(zone => { zoneCounts[zone] = (zoneCounts[zone] || 0) + 1 })
+  })
+  const zones = Object.entries(zoneCounts).sort((a, b) => b[1] - a[1])
+
+  const scores = exList.map(e => Number(e.difficulty_score)).filter(Boolean)
+  const avgIntensity = scores.length
+    ? (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1)
+    : null
+
+  if (zones.length === 0 && !avgIntensity) return null
+
+  return (
+    <div className="w-full bg-[#1a1a1a] rounded-2xl p-4 mb-6 text-left">
+      <p className="text-white/40 text-xs uppercase tracking-wider mb-3">Ce que tu as travaillé</p>
+      {zones.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {zones.map(([zone, count]) => (
+            <span key={zone} className="px-2.5 py-1 bg-orange-500/15 text-orange-300 text-xs rounded-full capitalize">
+              {zone}{count > 1 ? ` ×${count}` : ''}
+            </span>
+          ))}
+        </div>
+      )}
+      {avgIntensity && (
+        <div className="flex items-center gap-2">
+          <span className="text-white/40 text-xs">Intensité moyenne</span>
+          <span className="text-orange-400 font-semibold text-sm">{avgIntensity}/5</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SessionScreen() {
   const { exercises, muscleGroups, addSession, dailyCheckins, sessionFeedbacks, trainingProfile, adaptiveConfig } = useStore()
   const { generateSessionProfile } = useAdaptiveEngine()
@@ -436,6 +478,7 @@ export default function SessionScreen() {
   const [expanded, setExpanded] = useState(null)
   const [sequence, setSequence] = useState(null)
   const [finishedSessionId, setFinishedSessionId] = useState(null)
+  const [finishedExerciseIds, setFinishedExerciseIds] = useState([])
 
   useEffect(() => {
     const todayCheckin = dailyCheckins.find(c => c.date === today())
@@ -469,15 +512,19 @@ export default function SessionScreen() {
 
     let seq
     if (exList) {
-      const work_sec = trainingProfile?.work_sec_base || 25
-      const rest_sec = trainingProfile?.rest_sec_base || 35
+      const work_sec = trainingProfile?.work_sec_base || 40
+      const rest_sec = trainingProfile?.rest_sec_base || 20
+      const target_sec = adaptiveConfig?.target_session_sec || 300
+      const N = Math.ceil((target_sec + rest_sec) / (work_sec + rest_sec))
       seq = []
-      exList.forEach((ex, i) => {
+      for (let i = 0; i < N; i++) {
+        const ex = exList[i % exList.length]
+        const nextEx = exList[(i + 1) % exList.length]
         seq.push({ type: 'exercise', exercise: ex, duration_sec: work_sec })
-        if (i < exList.length - 1) {
-          seq.push({ type: 'rest', nextExercise: exList[i + 1], duration_sec: rest_sec })
+        if (i < N - 1) {
+          seq.push({ type: 'rest', nextExercise: nextEx, duration_sec: rest_sec })
         }
-      })
+      }
     } else {
       const result = generateSessionProfile({
         exercises: activePool(),
@@ -535,7 +582,7 @@ export default function SessionScreen() {
       <GuidedPlayer
         sequence={sequence}
         onAbandon={() => setStep('pick')}
-        onFinish={(sid) => { setFinishedSessionId(sid); setStep('feedback') }}
+        onFinish={(sid, exIds) => { setFinishedSessionId(sid); setFinishedExerciseIds(exIds || []); setStep('feedback') }}
       />
     )
   }
@@ -554,9 +601,10 @@ export default function SessionScreen() {
       <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 pb-24 text-center">
         <div className="text-6xl mb-4">✅</div>
         <h2 className="text-2xl font-bold text-white mb-2">Séance enregistrée</h2>
-        <p className="text-white/50 mb-8">Bien joué !</p>
+        <p className="text-white/50 mb-6">Bien joué !</p>
+        <SessionRecap exerciseIds={finishedExerciseIds} allExercises={exercises} />
         <button
-          onClick={() => setStep('pick')}
+          onClick={() => { setFinishedExerciseIds([]); setStep('pick') }}
           className="bg-orange-500 text-white px-8 py-3 rounded-2xl font-semibold"
         >
           Nouvelle séance
@@ -570,16 +618,25 @@ export default function SessionScreen() {
       setSessionExercises(exs => exs.map(e => e.id === id ? { ...e, done: !e.done } : e))
     }
     function finishManual(status) {
+      const sid = nanoid()
+      const exIds = sessionExercises.map(e => e.id)
       addSession({
-        id: nanoid(),
+        id: sid,
         date: today(),
         status,
         source: 'manual',
         completed_at: new Date().toISOString(),
-        exercises: sessionExercises.map(e => e.id),
+        exercises: exIds,
         done_count: sessionExercises.filter(e => e.done).length,
       })
-      setStep('done')
+      if (status === 'completed') {
+        setFinishedSessionId(sid)
+        setFinishedExerciseIds(exIds)
+        setStep('feedback')
+      } else {
+        setFinishedExerciseIds([])
+        setStep('done')
+      }
     }
     return (
       <div className="min-h-[100dvh] flex flex-col pb-28">
@@ -631,6 +688,7 @@ export default function SessionScreen() {
 
   // ── PICK screen ─────────────────────────────────────────────────────────────
   const todayCheckin = dailyCheckins.find(c => c.date === today())
+  const targetMin = Math.round((adaptiveConfig?.target_session_sec || 300) / 60)
 
   return (
     <div className="min-h-[100dvh] pb-28">
@@ -702,7 +760,7 @@ export default function SessionScreen() {
           onClick={() => launchGuided(null)}
           className="w-full bg-orange-500 hover:bg-orange-400 text-white font-semibold py-4 rounded-2xl text-base transition-colors"
         >
-          ⚡ Séance guidée ~5 min{selectedZone ? ` — ${selectedZone === '__unclassified__' ? 'Non classés' : selectedZone}` : ''}
+          ⚡ Séance guidée ~{targetMin} min{selectedZone ? ` — ${selectedZone === '__unclassified__' ? 'Non classés' : selectedZone}` : ''}
         </button>
       </div>
       <div className="px-4 mb-5">

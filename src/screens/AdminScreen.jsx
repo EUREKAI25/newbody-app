@@ -521,7 +521,7 @@ function ExerciseCard({ ex, group, onEdit, onDelete, isExpanded, onToggle }) {
           {videoSrc && (
             <div className="rounded-lg overflow-hidden bg-black">
               <video src={videoSrc} controls playsInline preload="metadata"
-                className="w-full max-h-64 object-contain"/>
+                className="w-full max-h-[70vh] block"/>
             </div>
           )}
           <label className={`flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/8 rounded-xl px-4 py-3 border border-dashed border-white/10 transition-colors ${uploading ? 'opacity-50' : ''}`}>
@@ -1043,7 +1043,7 @@ function ClassifySection() {
                           controls
                           playsInline
                           preload="metadata"
-                          className="w-full max-h-48 object-contain"
+                          className="w-full max-h-[70vh] block"
                           onError={e => { if (!e.target.src.includes('%')) { e.target.src = raw } }}
                         />
                         <p className="text-white/30 text-xs px-3 py-1.5">
