@@ -416,12 +416,22 @@ function GuidedPlayer({ sequence, onAbandon, onFinish }) {
 }
 
 // ── Screen principal ──────────────────────────────────────────────────────────
+function parseZones(ex) {
+  if (!ex.zones_json) return []
+  try {
+    const z = JSON.parse(ex.zones_json)
+    return Array.isArray(z) ? z : []
+  } catch { return [] }
+}
+
 export default function SessionScreen() {
   const { exercises, muscleGroups, addSession, dailyCheckins, sessionFeedbacks, trainingProfile, adaptiveConfig } = useStore()
   const { generateSessionProfile } = useAdaptiveEngine()
 
   const [step, setStep] = useState('init') // init | checkin | pick | playing | feedback | done
-  const [selectedGroup, setSelectedGroup] = useState(null)
+  const [selectedZone, setSelectedZone] = useState(null) // null=all, '__unclassified__', or zone string
+  const [complexityFilter, setComplexityFilter] = useState(null) // null | 'simple' | 'complex'
+  const [sortAsc, setSortAsc] = useState(true)
   const [sessionExercises, setSessionExercises] = useState([])
   const [expanded, setExpanded] = useState(null)
   const [sequence, setSequence] = useState(null)
@@ -433,9 +443,24 @@ export default function SessionScreen() {
   }, [dailyCheckins])
 
   const activeExercises = exercises.filter(e => e.is_active)
-  const exercisesByGroup = selectedGroup
-    ? activeExercises.filter(e => e.muscle_group_id === selectedGroup)
-    : activeExercises
+  const allZones = [...new Set(activeExercises.flatMap(e => parseZones(e)))].sort()
+  const hasUnclassified = activeExercises.some(e => parseZones(e).length === 0)
+  function zonePool(exList) {
+    if (selectedZone === null) return exList
+    if (selectedZone === '__unclassified__') return exList.filter(e => parseZones(e).length === 0)
+    return exList.filter(e => parseZones(e).includes(selectedZone))
+  }
+  function complexityPool(exList) {
+    if (complexityFilter === null) return exList
+    if (complexityFilter === 'simple') return exList.filter(e => parseZones(e).length === 1)
+    return exList.filter(e => parseZones(e).length >= 2)
+  }
+  function activePool() { return complexityPool(zonePool(activeExercises)) }
+  const filteredExercises = [...activePool()].sort((a, b) => {
+    const da = a.difficulty_score ?? 999
+    const db = b.difficulty_score ?? 999
+    return sortAsc ? da - db : db - da
+  })
 
   function launchGuided(exList) {
     const todayCheckin = dailyCheckins.find(c => c.date === today())
@@ -455,7 +480,7 @@ export default function SessionScreen() {
       })
     } else {
       const result = generateSessionProfile({
-        exercises: activeExercises,
+        exercises: activePool(),
         trainingProfile,
         adaptiveConfig,
         todayCheckin,
@@ -479,15 +504,13 @@ export default function SessionScreen() {
   }
 
   function startRandom() {
-    const pool = selectedGroup
-      ? activeExercises.filter(e => e.muscle_group_id === selectedGroup)
-      : activeExercises
+    const pool = activePool()
     const shuffled = [...pool].sort(() => Math.random() - 0.5)
     launchGuided(shuffled.slice(0, Math.min(4, shuffled.length)))
   }
 
   function launchGuidedWith(mandatoryEx) {
-    const others = activeExercises
+    const others = activePool()
       .filter(e => e.id !== mandatoryEx.id)
       .sort(() => Math.random() - 0.5)
       .slice(0, 3)
@@ -580,7 +603,7 @@ export default function SessionScreen() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
                       <p className="font-semibold text-white">{ex.name}</p>
-                      <p className="text-orange-400/80 text-xs mt-0.5">{group?.name}</p>
+                      <p className="text-orange-400/80 text-xs mt-0.5 capitalize">{parseZones(ex).slice(0, 2).join(', ')}</p>
                     </div>
                     <button
                       onClick={() => toggleDone(ex.id)}
@@ -634,19 +657,43 @@ export default function SessionScreen() {
       <div className="px-4 mb-4 overflow-x-auto">
         <div className="flex gap-2 pb-1" style={{ width: 'max-content' }}>
           <button
-            onClick={() => setSelectedGroup(null)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${selectedGroup === null ? 'bg-orange-500 text-white' : 'bg-white/10 text-white/60'}`}
+            onClick={() => setSelectedZone(null)}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${selectedZone === null ? 'bg-orange-500 text-white' : 'bg-white/10 text-white/60'}`}
           >
             Tous
           </button>
-          {muscleGroups.map(g => (
-            <button key={g.id} onClick={() => setSelectedGroup(g.id === selectedGroup ? null : g.id)}
-              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${selectedGroup === g.id ? 'bg-orange-500 text-white' : 'bg-white/10 text-white/60'}`}
+          {allZones.map(zone => (
+            <button key={zone} onClick={() => setSelectedZone(zone === selectedZone ? null : zone)}
+              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors capitalize ${selectedZone === zone ? 'bg-orange-500 text-white' : 'bg-white/10 text-white/60'}`}
             >
-              {g.icon} {g.name}
+              {zone}
             </button>
           ))}
+          {hasUnclassified && (
+            <button onClick={() => setSelectedZone(selectedZone === '__unclassified__' ? null : '__unclassified__')}
+              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${selectedZone === '__unclassified__' ? 'bg-white/20 text-white' : 'bg-white/5 text-white/40'}`}
+            >
+              Non classés
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Complexity filter */}
+      <div className="px-4 mb-4 flex gap-2">
+        {[
+          { key: null,      label: 'Tous' },
+          { key: 'simple',  label: 'Simple' },
+          { key: 'complex', label: 'Complexe' },
+        ].map(({ key, label }) => (
+          <button
+            key={String(key)}
+            onClick={() => setComplexityFilter(key)}
+            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${complexityFilter === key ? 'bg-white/20 text-white font-medium' : 'bg-white/5 text-white/40'}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Guided session button */}
@@ -655,7 +702,7 @@ export default function SessionScreen() {
           onClick={() => launchGuided(null)}
           className="w-full bg-orange-500 hover:bg-orange-400 text-white font-semibold py-4 rounded-2xl text-base transition-colors"
         >
-          ⚡ Séance guidée ~5 min{selectedGroup ? ` — ${muscleGroups.find(g => g.id === selectedGroup)?.name}` : ''}
+          ⚡ Séance guidée ~5 min{selectedZone ? ` — ${selectedZone === '__unclassified__' ? 'Non classés' : selectedZone}` : ''}
         </button>
       </div>
       <div className="px-4 mb-5">
@@ -669,9 +716,17 @@ export default function SessionScreen() {
 
       {/* Exercise list */}
       <div className="px-4 space-y-2">
-        <p className="text-white/30 text-xs uppercase tracking-wider mb-3">Ou choisir un exercice</p>
-        {exercisesByGroup.map(ex => {
-          const group = muscleGroups.find(g => g.id === ex.muscle_group_id)
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-white/30 text-xs uppercase tracking-wider">Ou choisir un exercice</p>
+          <button
+            onClick={() => setSortAsc(s => !s)}
+            className="text-white/30 hover:text-white/60 text-xs flex items-center gap-1 transition-colors"
+          >
+            Difficulté {sortAsc ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
+          </button>
+        </div>
+        {filteredExercises.map(ex => {
+          const zones = parseZones(ex)
           return (
             <button
               key={ex.id}
@@ -681,12 +736,15 @@ export default function SessionScreen() {
               <div className="w-10 h-10 rounded-lg bg-orange-900/30 flex items-center justify-center text-lg flex-shrink-0 overflow-hidden">
                 {ex.video_url || ex.media_url
                   ? <ExerciseMedia exercise={ex} loop={false} className="w-full h-full object-cover" />
-                  : group?.icon
+                  : '💪'
                 }
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium">{ex.name}</p>
-                <p className="text-white/30 text-xs">{group?.name} · {ex.type}</p>
+                <p className="text-white/30 text-xs capitalize">
+                  {zones.length > 0 ? zones.slice(0, 2).join(', ') : 'Non classé'}
+                  {ex.difficulty_score ? ` · niv. ${ex.difficulty_score}/5` : ''}
+                </p>
               </div>
               <Plus size={16} className="text-orange-400 flex-shrink-0" />
             </button>

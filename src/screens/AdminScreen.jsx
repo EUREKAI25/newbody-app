@@ -526,7 +526,7 @@ function ExerciseCard({ ex, group, onEdit, onDelete, isExpanded, onToggle }) {
           )}
           <label className={`flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/8 rounded-xl px-4 py-3 border border-dashed border-white/10 transition-colors ${uploading ? 'opacity-50' : ''}`}>
             <Upload size={15} className="text-orange-400 flex-shrink-0"/>
-            <span className="text-sm text-white/50">{uploading ? 'Upload…' : 'Uploader visuels pour IA (2–4 screenshots)'}</span>
+            <span className="text-sm text-white/50">{uploading ? 'Upload…' : 'Uploader visuels pour IA (2–8 screenshots)'}</span>
             <input type="file" accept="image/*" multiple className="hidden" disabled={uploading}
               onChange={e => handleUpload(e.target.files)}/>
           </label>
@@ -1055,11 +1055,11 @@ function ClassifySection() {
 
                   {/* Upload visuels */}
                   <div>
-                    <p className="text-white/40 text-xs mb-2">Visuels de séquence (2–4 screenshots dans l'ordre)</p>
+                    <p className="text-white/40 text-xs mb-2">Visuels de séquence (2–8 screenshots dans l'ordre)</p>
                     <label className={`flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/8 rounded-xl px-4 py-3 border border-dashed border-white/10 transition-colors ${isUploading ? 'opacity-50' : ''}`}>
                       <Upload size={16} className="text-orange-400 flex-shrink-0"/>
                       <span className="text-sm text-white/50">
-                        {isUploading ? 'Upload en cours…' : ex.visual_count > 0 ? `Remplacer les ${ex.visual_count} visuel(s)` : 'Choisir 2–4 images (position 1 → fin)'}
+                        {isUploading ? 'Upload en cours…' : ex.visual_count > 0 ? `Remplacer les ${ex.visual_count} visuel(s)` : 'Choisir 2–8 images (position 1 → fin)'}
                       </span>
                       <input type="file" accept="image/*" multiple className="hidden" disabled={isUploading}
                         onChange={e => handleUpload(ex.id, e.target.files)}/>
